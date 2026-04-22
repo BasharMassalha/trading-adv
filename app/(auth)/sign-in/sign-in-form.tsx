@@ -1,16 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { LoadingOverlay } from "@/components/loading/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+const GOOGLE_ERROR: Record<string, string> = {
+  google_cancelled: "Google sign in was cancelled.",
+  google_unconfigured: "Google sign in is not configured on this environment.",
+  google_state: "The sign in session expired. Please try again.",
+  google_invalid: "Google returned an invalid response. Please try again.",
+  google_denied: "Google could not sign you in. Please try again.",
+  google_signin: "We could not complete Google sign in. Please try again or use email.",
+};
 
-export function SignInForm() {
+export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const paramError = useMemo(() => {
+    const k = searchParams.get("error");
+    if (!k) return null;
+    return GOOGLE_ERROR[k] ?? "Something went wrong with sign in. Please try again.";
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -41,13 +57,29 @@ export function SignInForm() {
     }
   }
 
+  const displayError = error ?? paramError;
+
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <LoadingOverlay
-        show={loading}
-        message="Signing in…"
-        zIndexClass="z-[220]"
-      />
+    <div className="space-y-4">
+      {googleEnabled ? (
+        <div className="space-y-3">
+          <GoogleSignInButton label="Continue with Google" />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Or email</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <form onSubmit={onSubmit} className="space-y-4">
+        <LoadingOverlay
+          show={loading}
+          message="Signing in…"
+          zIndexClass="z-[220]"
+        />
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -70,14 +102,15 @@ export function SignInForm() {
           required
         />
       </div>
-      {error ? (
+      {displayError ? (
         <p className="text-sm text-destructive" role="alert">
-          {error}
+          {displayError}
         </p>
       ) : null}
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Signing in..." : "Sign in"}
       </Button>
     </form>
+    </div>
   );
 }

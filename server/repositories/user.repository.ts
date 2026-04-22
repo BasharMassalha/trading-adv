@@ -9,6 +9,13 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { email } });
   },
 
+  /** Match email ignoring case (PostgreSQL). Use for OAuth where casing may differ. */
+  findByEmailLoose(email: string): Promise<User | null> {
+    return prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: "insensitive" } },
+    });
+  },
+
   findById(id: string): Promise<User | null> {
     return prisma.user.findUnique({ where: { id } });
   },

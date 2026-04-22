@@ -6,6 +6,16 @@ advisory reports.
 
 ---
 
+## Security notes
+
+- **Secrets** live in `.env` locally (gitignored) and in your host’s env (e.g. Vercel). Never commit `.env` or paste keys into the repo.
+- **Client bundle** only exposes `NEXT_PUBLIC_*` (see `lib/env.ts`); all API keys, DB, and `AUTH_SECRET` are server-only.
+- **API errors** return generic 500 messages to the browser; details stay in server logs (`lib/api-response.ts`).
+- **Production** refuses weak or default `AUTH_SECRET` values and requires length ≥ 32.
+- **OAuth** callback does not put internal error text in the redirect URL.
+- **Headers** in `next.config.mjs` set `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and `Permissions-Policy` (review if you need embeds or camera).
+- For higher assurance later: add rate limiting on auth routes, a CSRF policy for state-changing Server Actions, and tighten `images.remotePatterns` if you do not need arbitrary image hosts.
+
 ## Tech stack
 
 | Layer | Choice |

@@ -45,6 +45,10 @@ const serverSchema = z.object({
   // Filings provider configuration
   FILINGS_PROVIDER: z.enum(["mock", "sec", "sec-edgar"]).default("mock"),
 
+  // Google OAuth (Sign in with Google)
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+
   // Runtime
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
@@ -60,6 +64,15 @@ export const clientEnv = clientSchema.parse({
 });
 
 let _serverEnv: z.infer<typeof serverSchema> | null = null;
+
+/** Must never be used in production; checked after parse. */
+const INSECURE_DEFAULT_AUTH_SECRET = "dev-insecure-secret-change-me-please";
+const INSECURE_EXAMPLE_AUTH_SECRET = "replace-me-with-a-long-random-string";
+
+const FORBIDDEN_PRODUCTION_SECRETS = new Set([
+  INSECURE_DEFAULT_AUTH_SECRET,
+  INSECURE_EXAMPLE_AUTH_SECRET,
+]);
 
 export function serverEnv() {
   if (typeof window !== "undefined") {
@@ -81,8 +94,23 @@ export function serverEnv() {
       NEWS_PROVIDER: process.env.NEWS_PROVIDER,
       NEWS_API_KEY: process.env.NEWS_API_KEY,
       FILINGS_PROVIDER: process.env.FILINGS_PROVIDER,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID?.trim() || undefined,
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined,
       NODE_ENV: process.env.NODE_ENV,
     });
+    if (_serverEnv.NODE_ENV === "production") {
+      const s = _serverEnv.AUTH_SECRET;
+      if (s.length < 32) {
+        throw new Error(
+          "AUTH_SECRET must be at least 32 characters in production. Generate e.g. with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"",
+        );
+      }
+      if (FORBIDDEN_PRODUCTION_SECRETS.has(s)) {
+        throw new Error(
+          "Set AUTH_SECRET to a long random value in production (do not use dev or .env.example placeholder values).",
+        );
+      }
+    }
   }
   return _serverEnv;
 }
