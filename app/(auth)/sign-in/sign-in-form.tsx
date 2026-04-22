@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingOverlay } from "@/components/loading/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,13 +37,17 @@ export function SignInForm() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");
-    } finally {
       setLoading(false);
     }
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <LoadingOverlay
+        show={loading}
+        message="Signing in…"
+        zIndexClass="z-[220]"
+      />
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input

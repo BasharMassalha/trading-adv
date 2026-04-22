@@ -142,13 +142,47 @@ All API responses follow the envelope:
 
 ## Deployment (Vercel)
 
-1. Push to GitHub and import into Vercel.
-2. Add the environment variables from `.env.example` in _Project → Settings → Environment Variables_.
-3. Use [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres) or [Neon](https://neon.tech) for the database.
-4. Run `prisma migrate deploy` as part of your build script (or run it manually after the first deploy).
+You need a **Git** remote (e.g. GitHub), a **hosted PostgreSQL** database, and env vars in Vercel. The repo includes `vercel.json` so production builds run `npm run vercel-build` (migrations, then Prisma client, then `next build`).
 
-The `postinstall` script in `package.json` automatically runs `prisma generate`
-on every Vercel build so the Prisma client is always in sync.
+### Steps (do in order)
+
+1. **Commit and push** this project to GitHub (or GitLab / Bitbucket). Include `prisma/migrations/` (initial schema migration is in the repo).
+
+2. **Create a PostgreSQL database** (pick one):
+   - [Neon](https://neon.tech) (free tier, works well with Vercel), or
+   - [Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres), or any Postgres with a connection string.
+
+3. **Create a Vercel account** at [vercel.com](https://vercel.com) and sign in with GitHub.
+
+4. **Import the repo**: Vercel Dashboard → Add New → Project → select your repo → Import.  
+   Framework preset: **Next.js**. Root directory: repo root (default).  
+   Build command is read from `vercel.json` (`npm run vercel-build`).
+
+5. **Environment variables** (Vercel → Project → Settings → Environment Variables).  
+   Add at least these for **Production** (copy names from `.env.example`):
+
+   | Variable | Notes |
+   |----------|--------|
+   | `DATABASE_URL` | Pooled connection string from Neon/Vercel Postgres (often ends with `?sslmode=require`). |
+   | `DIRECT_URL` | Non-pooled URL for migrations (Neon provides both; Vercel Postgres docs show both). |
+   | `AUTH_SECRET` | Long random string (e.g. `openssl rand -base64 32`). **Required in production.** |
+   | `NEXT_PUBLIC_APP_URL` | Your live site URL, e.g. `https://your-project.vercel.app` (set after first deploy or use your custom domain). |
+   | `NEXT_PUBLIC_APP_NAME` | e.g. `Terminal001` |
+
+   Optional but common: `OPENAI_API_KEY`, `ANALYSIS_PROVIDER=openai`, `NEWS_PROVIDER` / `NEWS_API_KEY`, `FILINGS_PROVIDER=sec`, etc.
+
+6. **Deploy** (first deploy or Redeploy). The build runs `prisma migrate deploy` against `DATABASE_URL`, so the database should be **empty** on first deploy, or already managed by Prisma migrations.
+
+7. **Set `NEXT_PUBLIC_APP_URL`** to your final URL (Vercel gives you `https://<project>.vercel.app`) and redeploy if you had to guess the URL on the first try.
+
+8. **Custom domain** (optional): Project → Settings → Domains → add your domain and follow DNS instructions.
+
+### Local vs production
+
+- `npm run build` runs `prisma generate` + `next build` (no migrate), so you can build locally without applying migrations.
+- On Vercel, `npm run vercel-build` runs `prisma migrate deploy` first.
+
+`postinstall` runs `prisma generate` after `npm install` on Vercel as well.
 
 ---
 

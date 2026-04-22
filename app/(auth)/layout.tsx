@@ -1,6 +1,4 @@
-import Link from "next/link";
-import { LineChart } from "lucide-react";
-import { clientEnv } from "@/lib/env";
+import { AuthHomeLink } from "@/components/auth/auth-home-link";
 
 export default function AuthLayout({
   children,
@@ -13,15 +11,7 @@ export default function AuthLayout({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[500px] bg-gradient-to-b from-primary/10 via-transparent to-transparent" />
 
       <div className="relative z-10 w-full max-w-md">
-        <Link
-          href="/"
-          className="mb-8 flex items-center justify-center gap-2 text-sm font-semibold tracking-tight"
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <LineChart className="h-4 w-4" />
-          </span>
-          {clientEnv.NEXT_PUBLIC_APP_NAME}
-        </Link>
+        <AuthHomeLink />
         {children}
       </div>
     </div>

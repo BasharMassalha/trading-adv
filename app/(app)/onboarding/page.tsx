@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { clientEnv } from "@/lib/env";
 import { analysisService } from "@/server/services/analysis.service";
 import { OnboardingWizard } from "./onboarding-wizard";
 
@@ -26,7 +27,7 @@ export default async function OnboardingPage() {
       <div className="container py-8 md:py-12">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-            Welcome to Trading Advisor
+            Welcome to {clientEnv.NEXT_PUBLIC_APP_NAME}
           </h1>
           <p className="mt-2 text-muted-foreground">
             Let's set up your investment profile in just a few steps

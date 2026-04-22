@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { clientEnv } from "@/lib/env";
 
 export function EmptyDashboard() {
   return (
@@ -26,7 +27,9 @@ export function EmptyDashboard() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <TrendingUp className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Welcome to Trading Advisor</CardTitle>
+          <CardTitle className="text-2xl">
+            Welcome to {clientEnv.NEXT_PUBLIC_APP_NAME}
+          </CardTitle>
           <CardDescription className="text-base">
             Upload your portfolio to get personalized AI-powered insights,
             analysis, and recommendations.

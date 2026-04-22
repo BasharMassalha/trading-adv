@@ -50,7 +50,7 @@ const serverSchema = z.object({
 });
 
 const clientSchema = z.object({
-  NEXT_PUBLIC_APP_NAME: z.string().default("Trading Adv"),
+  NEXT_PUBLIC_APP_NAME: z.string().default("Terminal001"),
   NEXT_PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
 });
 

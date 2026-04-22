@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { NavigationLoadingProvider } from "@/components/loading/navigation-loading-context";
 import { clientEnv } from "@/lib/env";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -9,7 +10,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: {
-    default: `${clientEnv.NEXT_PUBLIC_APP_NAME} — AI Portfolio Advisor`,
+    default: `${clientEnv.NEXT_PUBLIC_APP_NAME} — Portfolio intelligence`,
     template: `%s · ${clientEnv.NEXT_PUBLIC_APP_NAME}`,
   },
   description:
@@ -40,7 +41,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <NavigationLoadingProvider>{children}</NavigationLoadingProvider>
         </ThemeProvider>
       </body>
     </html>

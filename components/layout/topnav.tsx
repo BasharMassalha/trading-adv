@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell, Search } from "lucide-react";
+import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,6 +22,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function Topnav() {
+  const pathname = usePathname();
+  const beginNavigation = useBeginNavigation();
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur md:px-6">
       <div className="relative hidden flex-1 md:block md:max-w-md">
@@ -41,7 +46,7 @@ export function Topnav() {
             <button className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Avatar className="h-9 w-9">
                 <AvatarImage src="" alt="" />
-                <AvatarFallback>TA</AvatarFallback>
+                <AvatarFallback>T0</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
@@ -49,14 +54,34 @@ export function Topnav() {
             <DropdownMenuLabel>My account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/settings">Settings</Link>
+              <Link
+                href="/settings"
+                onClick={() => {
+                  if (pathname === "/settings" || pathname.startsWith("/settings/"))
+                    return;
+                  beginNavigation();
+                }}
+              >
+                Settings
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/advisor">AI Advisor</Link>
+              <Link
+                href="/advisor"
+                onClick={() => {
+                  if (pathname === "/advisor" || pathname.startsWith("/advisor/"))
+                    return;
+                  beginNavigation();
+                }}
+              >
+                AI Advisor
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/api/auth/sign-out">Sign out</Link>
+              <Link href="/api/auth/sign-out" onClick={beginNavigation}>
+                Sign out
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
