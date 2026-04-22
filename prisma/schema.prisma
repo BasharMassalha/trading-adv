@@ -1,0 +1,249 @@
+// Prisma schema for Trading Adv
+// Run `npm run prisma:migrate` to apply schema changes to your database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth / users
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  portfolios        Portfolio[]
+  aiReports         AIReport[]
+  investmentProfile UserInvestmentProfile?
+
+  @@index([email])
+}
+
+// ---------------------------------------------------------------------------
+// User investment profile — captures investor preferences for AI analysis
+// ---------------------------------------------------------------------------
+
+enum RiskTolerance {
+  CONSERVATIVE
+  MODERATE
+  AGGRESSIVE
+}
+
+enum InvestmentHorizon {
+  SHORT      // < 3 years
+  MEDIUM     // 3–10 years
+  LONG       // 10+ years
+}
+
+enum InvestmentGoal {
+  GROWTH               // Maximise capital appreciation
+  INCOME               // Generate regular income (dividends/interest)
+  BALANCED             // Mix of growth and income
+  CAPITAL_PRESERVATION // Protect principal, beat inflation
+}
+
+enum AssetPreference {
+  ETF_ONLY       // Passive / index-focused
+  MOSTLY_ETFS    // Primarily ETFs with some individual picks
+  MIXED          // Balanced individual stocks and ETFs
+  MOSTLY_STOCKS  // Active stock picking
+}
+
+model UserInvestmentProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  riskTolerance     RiskTolerance     @default(MODERATE)
+  investmentHorizon InvestmentHorizon @default(MEDIUM)
+  investmentGoal    InvestmentGoal    @default(BALANCED)
+  assetPreference   AssetPreference   @default(MIXED)
+
+  /// Regions the investor prefers (e.g. ["US", "Europe", "Emerging Markets"])
+  preferredRegions String[] @default([])
+
+  /// Sectors the investor prefers (e.g. ["Technology", "Healthcare"])
+  preferredSectors String[] @default([])
+
+  /// Sectors the investor wishes to avoid (e.g. ["Tobacco", "Weapons"])
+  avoidedSectors String[] @default([])
+
+  /// Free-form notes about the investor's situation or constraints
+  notes String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio domain
+// ---------------------------------------------------------------------------
+
+enum PortfolioSource {
+  MANUAL
+  CSV
+  IMAGE
+  BROKER_SYNC
+}
+
+model Portfolio {
+  id             String          @id @default(cuid())
+  userId         String
+  name           String
+  baseCurrency   String          @default("USD")
+  source         PortfolioSource @default(MANUAL)
+  totalValue     Decimal?        @db.Decimal(18, 4)
+  totalCost      Decimal?        @db.Decimal(18, 4)
+  totalGain      Decimal?        @db.Decimal(18, 4)
+  lastEnrichedAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings  PortfolioHolding[]
+  aiReports AIReport[]
+
+  @@index([userId])
+}
+
+model PortfolioHolding {
+  id                 String   @id @default(cuid())
+  portfolioId        String
+  assetId            String
+  quantity           Decimal  @db.Decimal(24, 8)
+  averageCost        Decimal? @db.Decimal(18, 4)
+  currency           String   @default("USD")
+  /// Snapshot updated by the enrichment service
+  marketValue        Decimal? @db.Decimal(18, 4)
+  unrealizedGainLoss Decimal? @db.Decimal(18, 4)
+  /// Weight as a fraction 0–1; e.g. 0.125000 = 12.5%
+  weight             Decimal? @db.Decimal(10, 8)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset     Asset     @relation(fields: [assetId], references: [id])
+
+  @@unique([portfolioId, assetId])
+  @@index([portfolioId])
+  @@index([assetId])
+}
+
+// ---------------------------------------------------------------------------
+// Assets (reference + market data)
+// ---------------------------------------------------------------------------
+
+enum AssetType {
+  STOCK
+  ETF
+  CRYPTO
+  BOND
+  CASH
+  OTHER
+}
+
+model Asset {
+  id                 String    @id @default(cuid())
+  symbol             String    @unique
+  name               String
+  type               AssetType @default(STOCK)
+  exchange           String?
+  currency           String    @default("USD")
+  sector             String?
+  industry           String?
+  logoUrl            String?
+  description        String?
+  /// Latest enriched price from the market-data provider
+  latestPrice        Decimal?  @db.Decimal(18, 4)
+  /// Absolute price change vs previous close
+  priceChange        Decimal?  @db.Decimal(18, 4)
+  /// Percentage price change vs previous close
+  priceChangePercent Decimal?  @db.Decimal(8, 4)
+  marketCap          Decimal?  @db.Decimal(24, 4)
+  lastEnrichedAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  holdings     PortfolioHolding[]
+  priceHistory AssetPriceHistory[]
+
+  @@index([symbol])
+  @@index([type])
+}
+
+/// Daily OHLCV candles for an asset. Populated by the enrichment service.
+model AssetPriceHistory {
+  id      String   @id @default(cuid())
+  assetId String
+  /// Calendar date — stored as date-only (no time component)
+  date    DateTime @db.Date
+  close   Decimal  @db.Decimal(18, 4)
+  open    Decimal? @db.Decimal(18, 4)
+  high    Decimal? @db.Decimal(18, 4)
+  low     Decimal? @db.Decimal(18, 4)
+  volume  BigInt?
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, date])
+  @@index([assetId])
+  @@index([date])
+}
+
+// ---------------------------------------------------------------------------
+// AI advisor output — structured portfolio analysis reports
+// ---------------------------------------------------------------------------
+
+enum AIReportStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
+model AIReport {
+  id          String         @id @default(cuid())
+  userId      String
+  portfolioId String?
+  status      AIReportStatus @default(PENDING)
+
+  /// One-paragraph executive summary
+  summary String?
+
+  /// Structured analysis sections (stored as JSON arrays of strings)
+  strengths         Json? // string[]
+  risks             Json? // string[]
+  opportunities     Json? // string[]
+  suggestedActions  Json? // string[]
+  followUpQuestions Json? // string[]
+
+  /// Model/version that generated the report (e.g. "mock-v1", "gpt-4o")
+  modelUsed String?
+
+  /// Raw JSON payload from the LLM (for debugging / audit)
+  rawJson Json?
+
+  /// When analysis was triggered vs completed
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio? @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([portfolioId])
+  @@index([status])
+}
