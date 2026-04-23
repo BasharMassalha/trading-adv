@@ -47,14 +47,37 @@ export type ChatResponse = ChatMessage & {
   provider: string;
 };
 
+/** Every holding row passed to the model so "list all stocks" is grounded in real data. */
+type HoldingForPrompt = {
+  symbol: string;
+  name: string;
+  /** Portfolio weight 0–1 when known */
+  weight: number | undefined;
+};
+
 type InternalContext = {
   profile: UserInvestmentProfile | null;
   report: AIReport | null;
   portfolio: Portfolio | null;
   portfolioName: string | null;
+  /** Full list of tickers; news/filings only cover a subset */
+  holdingsForPrompt: HoldingForPrompt[] | null;
   newsContext?: NewsItem[];
   filingsContext?: FilingItem[];
 };
+
+function mapPortfolioToHoldingsForPrompt(
+  full: Awaited<ReturnType<typeof portfolioRepository.findById>>,
+): HoldingForPrompt[] | null {
+  if (!full?.holdings?.length) return null;
+  return [...full.holdings]
+    .map((h) => ({
+      symbol: h.asset.symbol,
+      name: h.asset.name,
+      weight: h.weight != null ? Number(h.weight) : undefined,
+    }))
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+}
 
 // ---------------------------------------------------------------------------
 // System prompt builder
@@ -164,6 +187,26 @@ function buildSystemPrompt(ctx: InternalContext): string {
     }
   }
 
+  if (ctx.holdingsForPrompt && ctx.holdingsForPrompt.length > 0) {
+    parts.push(
+      `\n## Complete holdings (authoritative)`,
+      `The user has **${ctx.holdingsForPrompt.length}** positions in this portfolio. This block is the full list — it is not limited to news or filings above.`,
+      `When the user asks for all stocks, every ticker, a complete list, or "what do I own", you must enumerate **every** position below. Do not stop after a few names; do not infer from the analysis report only.`,
+    );
+    for (const h of ctx.holdingsForPrompt) {
+      const w =
+        h.weight != null
+          ? ` — weight ≈ ${(h.weight * 100).toFixed(1)}% of portfolio`
+          : "";
+      parts.push(`- **${h.symbol}** — ${h.name}${w}`);
+    }
+  } else if (ctx.portfolio) {
+    parts.push(
+      `\n## Holdings`,
+      `No line-level holding details were loaded. If the user asks for a full list of tickers, say you cannot see individual positions in this context and they should check the portfolio screen.`,
+    );
+  }
+
   // Add news context for grounding
   if (ctx.newsContext && ctx.newsContext.length > 0) {
     parts.push(`\n## Recent News Context (prioritize in answers when it helps)`);
@@ -221,6 +264,30 @@ function generateMockResponse(
   ctx: InternalContext,
 ): string {
   const msg = userMessage.toLowerCase();
+
+  const wantsFullHoldingList =
+    (msg.includes("all the stock") ||
+      msg.includes("all your stock") ||
+      msg.includes("all my stock") ||
+      msg.includes("every stock") ||
+      msg.includes("name all") ||
+      msg.includes("list all") ||
+      msg.includes("full list of") ||
+      msg.includes("complete list") ||
+      msg.includes("what stock") && msg.includes("i have") ||
+      msg.includes("what do i own")) &&
+    (msg.includes("stock") || msg.includes("ticker") || msg.includes("hold") || msg.includes("own") || msg.includes("position"));
+
+  if (wantsFullHoldingList && ctx.holdingsForPrompt && ctx.holdingsForPrompt.length > 0) {
+    const lines = ctx.holdingsForPrompt.map((h) => {
+      const w =
+        h.weight != null
+          ? ` — ~${(h.weight * 100).toFixed(1)}% of the portfolio`
+          : "";
+      return `• **${h.symbol}** — ${h.name}${w}`;
+    });
+    return `Here are all **${ctx.holdingsForPrompt.length}** positions in your portfolio:\n\n${lines.join("\n\n")}\n\nAsk if you want more detail on any name.`;
+  }
 
   // Keyword-based routing with context awareness
   if (msg.includes("concentration") || msg.includes("weight") || msg.includes("allocation")) {
@@ -406,6 +473,7 @@ export const advisorService = {
       report: null,
       portfolio: null,
       portfolioName: null,
+      holdingsForPrompt: null,
       newsContext: undefined,
       filingsContext: undefined,
     };
@@ -423,13 +491,14 @@ export const advisorService = {
         ? portfolios.find((p) => p.id === context.portfolioId) ?? portfolios[0]
         : portfolios[0];
 
-      // Fetch news and filings context for the portfolio if available
+      // Fetch full holdings + news + filings for the portfolio if available
       let newsContext: NewsItem[] | undefined;
       let filingsContext: FilingItem[] | undefined;
+      let holdingsForPrompt: HoldingForPrompt[] | null = null;
 
       if (portfolio) {
-        // Fetch news and filings in parallel
-        const [newsResult, filingsResult] = await Promise.all([
+        const [fullPortfolio, newsResult, filingsResult] = await Promise.all([
+          portfolioRepository.findById(portfolio.id),
           newsService.getNewsForPortfolio(portfolio.id, {
             maxHoldings: 5,
             articlesPerTicker: 3,
@@ -449,6 +518,8 @@ export const advisorService = {
           }),
         ]);
 
+        holdingsForPrompt = mapPortfolioToHoldingsForPrompt(fullPortfolio);
+
         if (newsResult && newsResult.items.length > 0) {
           newsContext = newsResult.items;
         }
@@ -462,6 +533,7 @@ export const advisorService = {
         report,
         portfolio: portfolio ?? null,
         portfolioName: portfolio?.name ?? null,
+        holdingsForPrompt,
         newsContext,
         filingsContext,
       };
@@ -526,11 +598,17 @@ export const advisorService = {
       portfolioRepository.listByUser(userId),
     ]);
 
+    const first = portfolios[0] ?? null;
+    const full = first
+      ? await portfolioRepository.findById(first.id)
+      : null;
+
     return buildSystemPrompt({
       profile,
       report,
-      portfolio: portfolios[0] ?? null,
-      portfolioName: portfolios[0]?.name ?? null,
+      portfolio: first,
+      portfolioName: first?.name ?? null,
+      holdingsForPrompt: mapPortfolioToHoldingsForPrompt(full),
     });
   },
 
