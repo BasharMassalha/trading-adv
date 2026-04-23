@@ -39,6 +39,8 @@ export type HoldingRecommendation = {
 };
 
 export type AdditionSuggestion = {
+  /** Omitted in older stored reports */
+  ticker?: string;
   suggestion: string;
   rationale: string;
 };

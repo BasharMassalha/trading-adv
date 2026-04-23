@@ -374,7 +374,8 @@ function ReportDisplay({ report }: { report: ReportView }) {
               Action Plan
             </CardTitle>
             <CardDescription>
-              Specific recommendations based on your portfolio analysis
+              Holdings to review, ideas for new names to research, and rebalancing — grounded in
+              this analysis. Not personal financial advice.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -417,14 +418,24 @@ function ReportDisplay({ report }: { report: ReportView }) {
             {/* Potential Additions */}
             {report.actionPlan.potentialAdditions && report.actionPlan.potentialAdditions.length > 0 && (
               <div>
-                <h4 className="mb-3 font-semibold">Consider Adding</h4>
+                <h4 className="mb-1 font-semibold">Stocks & ETFs to consider (research next)</h4>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Specific symbols for your watchlist. Informational only — not a recommendation to buy
+                  or sell. Verify against your plan, costs, and tax situation.
+                </p>
                 <div className="space-y-3">
                   {report.actionPlan.potentialAdditions.map((a, i) => (
                     <div
                       key={i}
                       className="flex items-start gap-3 rounded-lg border bg-background p-3"
                     >
-                      <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                      {a.ticker ? (
+                        <Badge variant="secondary" className="shrink-0 font-mono text-xs">
+                          {a.ticker}
+                        </Badge>
+                      ) : (
+                        <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                      )}
                       <div>
                         <div className="text-sm font-medium">{a.suggestion}</div>
                         <p className="mt-1 text-sm text-muted-foreground">{a.rationale}</p>

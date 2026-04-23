@@ -152,8 +152,11 @@ export type HoldingRecommendation = {
   reason: string;
 };
 
-/** Suggestion for adding to portfolio */
+/** Suggestion for adding to portfolio (ETF or stock symbol + rationale) */
 export type AdditionSuggestion = {
+  /** US trading symbol; must not duplicate an existing holding */
+  ticker: string;
+  /** Short name or fund title (e.g. "Vanguard Total Stock Market ETF") */
   suggestion: string;
   rationale: string;
 };
@@ -162,8 +165,8 @@ export type AdditionSuggestion = {
 export type ActionPlan = {
   /** Holdings to review with specific actions */
   holdingsToReview?: HoldingRecommendation[];
-  /** Potential additions to consider */
-  potentialAdditions?: AdditionSuggestion[];
+  /** 2–5 tickers to consider buying/researching (aligned with profile; not duplicates of current holdings) */
+  potentialAdditions: AdditionSuggestion[];
   /** Concrete rebalancing steps in order of priority */
   rebalancingSteps?: string[];
 };
@@ -187,8 +190,8 @@ export type AnalysisReport = {
   /** Questions the AI might ask to deepen the analysis */
   followUpQuestions: string[];
 
-  /** Specific actionable plan with ticker-level recommendations */
-  actionPlan?: ActionPlan;
+  /** Specific actionable plan including buy/research ideas */
+  actionPlan: ActionPlan;
 };
 
 // ---------------------------------------------------------------------------

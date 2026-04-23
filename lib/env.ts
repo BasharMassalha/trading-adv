@@ -9,7 +9,7 @@ import { z } from "zod";
  * AI CONFIGURATION
  * ────────────────
  * - OPENAI_API_KEY: Required for OpenAI-based analysis and chat
- * - ANALYSIS_PROVIDER: "mock" | "openai" (default: "mock")
+ * - ANALYSIS_PROVIDER: "openai" (default) | "anthropic" (analysis not wired yet)
  * - OPENAI_ANALYSIS_MODEL: Model for portfolio analysis (default: "gpt-4o")
  * - OPENAI_CHAT_MODEL: Model for advisor chat (default: "gpt-4o")
  */
@@ -31,7 +31,19 @@ const serverSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
 
   // Provider selection
-  ANALYSIS_PROVIDER: z.enum(["mock", "openai", "anthropic"]).default("mock"),
+  ANALYSIS_PROVIDER: z
+    .preprocess((v) => {
+      if (v == null || v === "") return "openai";
+      const s = String(v).toLowerCase().trim();
+      if (s === "mock") {
+        console.warn(
+          "[env] ANALYSIS_PROVIDER=mock is no longer supported; using openai (AI-only analysis).",
+        );
+        return "openai";
+      }
+      return s;
+    }, z.enum(["openai", "anthropic"]))
+    .default("openai"),
   VISION_PROVIDER: z.enum(["auto", "openai", "mock"]).default("auto"),
   MARKET_DATA_PROVIDER: z
     .enum(["auto", "yahoo", "yahoo-finance", "mock"])

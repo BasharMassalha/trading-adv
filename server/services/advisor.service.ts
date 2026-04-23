@@ -1,24 +1,12 @@
 /**
- * AI advisor chat service.
+ * AI advisor chat (OpenAI only; no mock fallback).
+ * Requires OPENAI_API_KEY. Context includes profile, latest report, full holdings, news, filings.
  *
- * This service provides context-aware chat responses by:
- *   1. Loading the user's investor profile
- *   2. Loading the latest portfolio report
- *   3. Grounding responses in that context
- *
- * PROVIDER SUPPORT
- * ────────────────
- * - Mock: Rule-based responses (default)
- * - OpenAI: GPT-4 powered intelligent chat
- *
- * CONFIGURATION
- * ─────────────
- * - ANALYSIS_PROVIDER: "mock" | "openai"
- * - OPENAI_API_KEY: Required for OpenAI mode
- * - OPENAI_CHAT_MODEL: Model to use (default: gpt-4o)
+ * - OPENAI_CHAT_MODEL: optional (default: gpt-4o)
  */
 
 import OpenAI from "openai";
+import { AppError } from "@/lib/errors";
 import { investmentProfileRepository } from "@/server/repositories/investment-profile.repository";
 import { aiReportRepository } from "@/server/repositories/ai-report.repository";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
@@ -256,144 +244,6 @@ function formatRelativeDate(isoString: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Mock response generator (fallback)
-// ---------------------------------------------------------------------------
-
-function generateMockResponse(
-  userMessage: string,
-  ctx: InternalContext,
-): string {
-  const msg = userMessage.toLowerCase();
-
-  const wantsFullHoldingList =
-    (msg.includes("all the stock") ||
-      msg.includes("all your stock") ||
-      msg.includes("all my stock") ||
-      msg.includes("every stock") ||
-      msg.includes("name all") ||
-      msg.includes("list all") ||
-      msg.includes("full list of") ||
-      msg.includes("complete list") ||
-      msg.includes("what stock") && msg.includes("i have") ||
-      msg.includes("what do i own")) &&
-    (msg.includes("stock") || msg.includes("ticker") || msg.includes("hold") || msg.includes("own") || msg.includes("position"));
-
-  if (wantsFullHoldingList && ctx.holdingsForPrompt && ctx.holdingsForPrompt.length > 0) {
-    const lines = ctx.holdingsForPrompt.map((h) => {
-      const w =
-        h.weight != null
-          ? ` — ~${(h.weight * 100).toFixed(1)}% of the portfolio`
-          : "";
-      return `• **${h.symbol}** — ${h.name}${w}`;
-    });
-    return `Here are all **${ctx.holdingsForPrompt.length}** positions in your portfolio:\n\n${lines.join("\n\n")}\n\nAsk if you want more detail on any name.`;
-  }
-
-  // Keyword-based routing with context awareness
-  if (msg.includes("concentration") || msg.includes("weight") || msg.includes("allocation")) {
-    if (ctx.report) {
-      const risks = ctx.report.risks as string[] | null;
-      const concentrationRisk = risks?.find((r) => r.toLowerCase().includes("concentration"));
-      if (concentrationRisk) {
-        return `Based on your portfolio analysis: ${concentrationRisk}\n\nYou may want to consider gradually rebalancing to reduce single-stock risk while still maintaining exposure to your top performers.`;
-      }
-    }
-    return "I'd recommend looking at any position that exceeds 25-30% of your portfolio. Large concentrated positions can amplify both gains and losses. Consider whether trimming to a target allocation makes sense for your risk tolerance.";
-  }
-
-  if (msg.includes("risk") || msg.includes("volatile") || msg.includes("volatility")) {
-    if (ctx.profile?.riskTolerance === "CONSERVATIVE") {
-      return "Given your conservative risk profile, you may want to focus on broad-market ETFs and dividend-paying stocks. These tend to be less volatile than growth stocks or crypto. Your current allocation should prioritize capital preservation.";
-    }
-    if (ctx.profile?.riskTolerance === "AGGRESSIVE") {
-      return "With your aggressive risk tolerance, some volatility is expected and can work in your favor over a long horizon. The key is ensuring you're diversified enough that no single position could significantly impact your overall wealth.";
-    }
-    return "Managing risk is about balancing potential returns with your comfort level. Consider your investment timeline — longer horizons can typically absorb more short-term volatility.";
-  }
-
-  if (msg.includes("rebalance") || msg.includes("rebalancing")) {
-    if (ctx.report) {
-      const actions = ctx.report.suggestedActions as string[] | null;
-      const rebalanceAction = actions?.find(
-        (a) => a.toLowerCase().includes("rebalance") || a.toLowerCase().includes("trim"),
-      );
-      if (rebalanceAction) {
-        return `From your analysis: ${rebalanceAction}\n\nRebalancing helps maintain your target allocation and can reduce concentration risk over time.`;
-      }
-    }
-    return "Rebalancing is typically recommended when positions drift significantly from your target allocation (often 5-10% or more). This helps lock in gains from winners and maintain your desired risk level.";
-  }
-
-  if (msg.includes("tax") || msg.includes("harvest")) {
-    return "Tax-loss harvesting involves selling positions at a loss to offset capital gains. If you have holdings that are down, you might consider whether selling makes sense before year-end. Be mindful of wash sale rules if you plan to repurchase similar securities.";
-  }
-
-  if (msg.includes("sector") || msg.includes("diversif")) {
-    if (ctx.report) {
-      const risks = ctx.report.risks as string[] | null;
-      const sectorRisk = risks?.find(
-        (r) => r.toLowerCase().includes("sector") || r.toLowerCase().includes("diversif"),
-      );
-      if (sectorRisk) {
-        return `The analysis noted: ${sectorRisk}\n\nDiversification across sectors can help protect against industry-specific downturns. Consider whether adding positions in underrepresented sectors aligns with your goals.`;
-      }
-    }
-    return "Diversification across sectors helps reduce industry-specific risk. A well-balanced portfolio typically spans technology, healthcare, financials, consumer goods, and other sectors based on your preferences.";
-  }
-
-  if (msg.includes("dividend") || msg.includes("income")) {
-    if (ctx.profile?.investmentGoal === "INCOME") {
-      return "Since income is your primary goal, you may want to focus on dividend-growth ETFs like SCHD or VYM, as well as established dividend aristocrats. These provide regular income while potentially offering some capital appreciation.";
-    }
-    return "For dividend income, consider established dividend-paying ETFs or blue-chip stocks with consistent payout histories. The yield should be balanced against total return potential and your tax situation.";
-  }
-
-  if (msg.includes("etf") || msg.includes("index")) {
-    if (ctx.profile?.assetPreference === "ETF_ONLY" || ctx.profile?.assetPreference === "MOSTLY_ETFS") {
-      return "ETFs are a great choice for your investment style. They offer low costs, instant diversification, and tax efficiency. Consider a core holding like VOO or VTI for broad market exposure, supplemented by sector or factor ETFs.";
-    }
-    return "ETFs provide a cost-effective way to gain broad market exposure. They're especially useful for sectors or regions where individual stock selection is difficult. Many investors use a core-satellite approach: ETFs for broad exposure, individual stocks for specific convictions.";
-  }
-
-  if (msg.includes("crypto") || msg.includes("bitcoin") || msg.includes("ethereum")) {
-    if (ctx.profile?.riskTolerance === "CONSERVATIVE") {
-      return "Cryptocurrency is highly volatile and may not align with a conservative investment approach. If you're interested in some exposure, consider keeping it to a small percentage (1-5%) that you'd be comfortable losing entirely.";
-    }
-    return "Crypto can provide growth potential but comes with significant volatility. Most financial advisors suggest keeping crypto exposure to a percentage you're comfortable with given the risk — typically 5-15% for more aggressive investors.";
-  }
-
-  if (msg.includes("goal") || msg.includes("objective") || msg.includes("target")) {
-    if (ctx.profile) {
-      return `Based on your ${ctx.profile.investmentGoal.toLowerCase().replace("_", " ")} objective and ${ctx.profile.investmentHorizon.toLowerCase()} time horizon, your portfolio should be structured to ${
-        ctx.profile.investmentGoal === "GROWTH"
-          ? "maximize capital appreciation, accepting higher volatility"
-          : ctx.profile.investmentGoal === "INCOME"
-            ? "generate reliable income while preserving capital"
-            : ctx.profile.investmentGoal === "CAPITAL_PRESERVATION"
-              ? "protect your principal with modest growth"
-              : "balance growth potential with income generation"
-      }.`;
-    }
-    return "Your investment goals should guide your allocation. Growth-focused portfolios typically hold more equities, while income-focused portfolios emphasize dividend stocks and bonds.";
-  }
-
-  if (msg.includes("market") || msg.includes("economy") || msg.includes("outlook")) {
-    return "Market conditions are always changing. Rather than trying to time the market, focus on maintaining a well-diversified portfolio aligned with your goals and risk tolerance. Regular rebalancing and staying invested through volatility typically leads to better long-term results.";
-  }
-
-  // Default responses grounded in context
-  if (ctx.report) {
-    return `Based on your portfolio analysis, here are the key points to consider:\n\n${ctx.report.summary}\n\nIs there a specific aspect of your portfolio you'd like to explore further?`;
-  }
-
-  if (ctx.profile) {
-    return `As a ${ctx.profile.riskTolerance.toLowerCase()} investor with a ${ctx.profile.investmentHorizon.toLowerCase()} time horizon, your portfolio should be structured to match these preferences. Would you like me to discuss specific aspects like sector allocation, diversification, or rebalancing strategies?`;
-  }
-
-  return "I can help you understand your portfolio, discuss allocation strategies, or explore specific concerns. What aspect of your investments would you like to explore? For more personalized advice, make sure to complete your investor profile and generate a portfolio analysis.";
-}
-
-// ---------------------------------------------------------------------------
 // OpenAI chat provider
 // ---------------------------------------------------------------------------
 
@@ -542,9 +392,15 @@ export const advisorService = {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
     const userMessage = lastUserMsg?.content ?? "";
 
-    // Check if we should use OpenAI
     const env = serverEnv();
-    const useOpenAI = env.ANALYSIS_PROVIDER === "openai" && env.OPENAI_API_KEY;
+    if (!env.OPENAI_API_KEY?.trim()) {
+      throw new AppError({
+        message:
+          "The AI advisor is not configured. Set OPENAI_API_KEY in your environment.",
+        status: 503,
+        code: "AI_NOT_CONFIGURED",
+      });
+    }
 
     console.info(
       "[advisor] Processing message:",
@@ -553,38 +409,23 @@ export const advisorService = {
       !!internalContext.profile,
       "| hasReport:",
       !!internalContext.report,
-      "| provider:",
-      useOpenAI ? "openai" : "mock",
+      "| provider: openai",
     );
 
-    let response: string;
-    let provider: string;
-
-    if (useOpenAI) {
-      try {
-        const systemPrompt = buildSystemPrompt(internalContext);
-        const model = env.OPENAI_CHAT_MODEL ?? "gpt-4o";
-        response = await generateOpenAIResponse(messages, systemPrompt, model);
-        provider = `openai-${model}`;
-      } catch (err) {
-        console.error("[advisor:openai] Error:", err);
-        // Fallback to mock in development
-        if (env.NODE_ENV === "development") {
-          console.warn("[advisor] Falling back to mock response");
-          response = generateMockResponse(userMessage, internalContext);
-          provider = "mock-fallback";
-        } else {
-          throw err;
-        }
-      }
-    } else {
-      // Simulate processing delay for mock
-      await new Promise((r) => setTimeout(r, 600));
-      response = generateMockResponse(userMessage, internalContext);
-      provider = "mock-v1";
+    try {
+      const systemPrompt = buildSystemPrompt(internalContext);
+      const model = env.OPENAI_CHAT_MODEL ?? "gpt-4o";
+      const content = await generateOpenAIResponse(messages, systemPrompt, model);
+      return { role: "assistant", content, provider: `openai-${model}` };
+    } catch (err) {
+      console.error("[advisor:openai] Error:", err);
+      if (err instanceof AppError) throw err;
+      throw new AppError({
+        message: "The advisor could not reach the AI service. Please try again.",
+        status: 502,
+        code: "AI_CHAT_ERROR",
+      });
     }
-
-    return { role: "assistant", content: response, provider };
   },
 
   /**
@@ -616,8 +457,7 @@ export const advisorService = {
    * Check if real AI chat is available.
    */
   isRealChatAvailable(): boolean {
-    const env = serverEnv();
-    return env.ANALYSIS_PROVIDER === "openai" && !!env.OPENAI_API_KEY;
+    return Boolean(serverEnv().OPENAI_API_KEY?.trim());
   },
 
   /**
@@ -625,9 +465,9 @@ export const advisorService = {
    */
   getChatProviderName(): string {
     const env = serverEnv();
-    if (env.ANALYSIS_PROVIDER === "openai" && env.OPENAI_API_KEY) {
+    if (env.OPENAI_API_KEY?.trim()) {
       return `openai-${env.OPENAI_CHAT_MODEL ?? "gpt-4o"}`;
     }
-    return "mock-v1";
+    return "unavailable";
   },
 };

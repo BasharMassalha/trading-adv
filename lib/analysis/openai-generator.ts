@@ -42,19 +42,34 @@ const analysisReportSchema = z.object({
   opportunities: z.array(z.string().min(10).max(500)).min(1).max(10),
   suggestedActions: z.array(z.string().min(10).max(500)).min(1).max(10),
   followUpQuestions: z.array(z.string().min(10).max(300)).min(1).max(5),
-  // Optional actionable plan with specific ticker suggestions
   actionPlan: z.object({
-    holdingsToReview: z.array(z.object({
-      ticker: z.string(),
-      action: z.enum(["CONSIDER_SELLING", "CONSIDER_REDUCING", "HOLD", "CONSIDER_ADDING"]),
-      reason: z.string().min(10).max(300),
-    })).optional(),
-    potentialAdditions: z.array(z.object({
-      suggestion: z.string(),
-      rationale: z.string().min(10).max(300),
-    })).optional(),
-    rebalancingSteps: z.array(z.string().min(10).max(300)).optional(),
-  }).optional(),
+    holdingsToReview: z
+      .array(
+        z.object({
+          ticker: z.string().min(1).max(10),
+          action: z.enum([
+            "CONSIDER_SELLING",
+            "CONSIDER_REDUCING",
+            "HOLD",
+            "CONSIDER_ADDING",
+          ]),
+          reason: z.string().min(10).max(300),
+        }),
+      )
+      .max(7)
+      .optional(),
+    potentialAdditions: z
+      .array(
+        z.object({
+          ticker: z.string().min(1).max(12),
+          suggestion: z.string().min(3).max(200),
+          rationale: z.string().min(10).max(400),
+        }),
+      )
+      .min(2)
+      .max(5),
+    rebalancingSteps: z.array(z.string().min(10).max(300)).max(6).optional(),
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -83,6 +98,13 @@ FILINGS:
 
 ACTIONABLE OUTPUT:
 - Name SPECIFIC TICKERS; connect news and filings to named holdings and to actionPlan reasons.
+
+BUY / RESEARCH IDEAS (REQUIRED):
+- actionPlan.potentialAdditions MUST have between 2 and 5 items.
+- Each item MUST include: ticker (real US-listed symbol), suggestion (short name of the security), rationale (why it could fit this portfolio and profile).
+- Every ticker in potentialAdditions MUST NOT appear in the current portfolio holdings list.
+- Prefer diversified ETFs and established names that align with the investor profile (risk, horizon, goal, sector prefs). Use cautious framing: "consider", "may want to research", not guarantees.
+- If the portfolio is already broad, suggest complementary sleeves (e.g. international, bonds, sector balance) with appropriate symbols.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching the schema. No markdown, no prose, no code blocks.`;
@@ -126,6 +148,17 @@ No recent news was retrieved. Base analysis on portfolio and profile data only. 
   sections.push(`\n## Holdings (${portfolio.holdings.length} positions)`);
   for (const h of portfolio.holdings) {
     sections.push(formatHolding(h));
+  }
+
+  const heldTickers = [
+    ...new Set(
+      portfolio.holdings.map((h) => h.symbol).filter((s) => s && s.trim().length > 0),
+    ),
+  ];
+  if (heldTickers.length > 0) {
+    sections.push(
+      `\n## Symbols already in this portfolio (do NOT repeat these in actionPlan.potentialAdditions; suggest different tickers only)\n${heldTickers.join(", ")}`,
+    );
   }
 
   // Sector allocation
@@ -214,8 +247,14 @@ Analyze this portfolio and return a JSON object with the following structure:
     ],
     "potentialAdditions": [
       {
-        "suggestion": "Healthcare ETF like XLV",
-        "rationale": "Diversify away from 45% tech concentration"
+        "ticker": "VXUS",
+        "suggestion": "Vanguard Total International Stock ETF",
+        "rationale": "Adds non-US exposure if the book is mostly domestic; aligns with diversification goals."
+      },
+      {
+        "ticker": "XLV",
+        "suggestion": "Health Care Select Sector SPDR Fund",
+        "rationale": "Defensive sector sleeve if tech/consumer weights are high; match risk tolerance before sizing."
       }
     ],
     "rebalancingSteps": [
@@ -226,10 +265,10 @@ Analyze this portfolio and return a JSON object with the following structure:
 }
 
 IMPORTANT RULES FOR actionPlan:
-- holdingsToReview: Review 2-5 holdings that need attention (overweight, underperforming, news concerns)
-- potentialAdditions: Suggest 1-3 areas to potentially add (can be asset classes, sectors, or specific ETF types)
-- rebalancingSteps: Give 2-4 concrete steps in order of priority
-- ALWAYS reference specific tickers from the portfolio
+- holdingsToReview: Optional; 0-7 rows for existing positions that need attention (overweight, underperforming, news concerns)
+- potentialAdditions: REQUIRED — 2-5 tickers the user could consider buying or researching next. Each row must have ticker + suggestion + rationale; no ticker may duplicate a symbol already in the portfolio.
+- rebalancingSteps: Optional; 2-4 concrete steps in order of priority when useful
+- holdingsToReview must reference tickers that appear in the portfolio
 - Connect recommendations to the data (concentration %, performance, news, filings)
 
 If Recent News Context above is non-empty:

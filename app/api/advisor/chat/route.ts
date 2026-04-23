@@ -13,9 +13,7 @@ import { advisorService } from "@/server/services/advisor.service";
  * - Latest portfolio report
  * - Current portfolio data
  *
- * Provider: Configured via ANALYSIS_PROVIDER env var
- * - "mock": Rule-based responses (default)
- * - "openai": GPT-4 powered intelligent chat
+ * Requires OPENAI_API_KEY (OpenAI only; no mock fallback).
  */
 export const POST = withErrorHandling(async (req: NextRequest) => {
   const session = await getSession();

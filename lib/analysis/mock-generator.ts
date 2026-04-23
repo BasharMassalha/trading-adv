@@ -15,9 +15,12 @@
  */
 
 import type {
+  ActionPlan,
+  AdditionSuggestion,
   AnalysisInput,
   AnalysisReport,
   HoldingContext,
+  HoldingRecommendation,
   IReportGenerator,
   PortfolioContext,
   InvestorProfileContext,
@@ -101,6 +104,103 @@ function getBiggestLoser(holdings: HoldingContext[]): HoldingContext | null {
     .filter((h) => h.unrealizedGainLossPct != null)
     .sort((a, b) => (a.unrealizedGainLossPct ?? 0) - (b.unrealizedGainLossPct ?? 0));
   return sorted[0] ?? null;
+}
+
+/** Broad pool of non-overlapping tickers for “consider buying” — excludes symbols already held */
+const MOCK_BUY_POOL: AdditionSuggestion[] = [
+  {
+    ticker: "VTI",
+    suggestion: "Vanguard Total Stock Market ETF",
+    rationale:
+      "Core U.S. market exposure in one low-cost fund; use if you want a simple domestic baseline.",
+  },
+  {
+    ticker: "VXUS",
+    suggestion: "Vanguard Total International Stock ETF",
+    rationale:
+      "Broad non-U.S. equities — helps when your book is very U.S.-centric.",
+  },
+  {
+    ticker: "BND",
+    suggestion: "Vanguard Total Bond Market ETF",
+    rationale:
+      "Aggregate U.S. bonds as a ballast; consider only if a fixed-income sleeve fits your horizon and return needs.",
+  },
+  {
+    ticker: "VGT",
+    suggestion: "Vanguard Information Technology ETF",
+    rationale:
+      "Diversified tech sector exposure (many names) if you are underweight tech vs your goals.",
+  },
+  {
+    ticker: "VYM",
+    suggestion: "Vanguard High Dividend Yield ETF",
+    rationale:
+      "May suit income-oriented goals; still subject to equity risk and sector tilts.",
+  },
+  {
+    ticker: "IEMG",
+    suggestion: "iShares Core MSCI Emerging Markets ETF",
+    rationale:
+      "Long-term emerging-markets sleeve for those willing to accept extra volatility.",
+  },
+  {
+    ticker: "VNQ",
+    suggestion: "Vanguard Real Estate ETF",
+    rationale:
+      "Listed real estate / REIT exposure as a small sleeve — size to your risk tolerance.",
+  },
+  {
+    ticker: "SCHB",
+    suggestion: "Schwab U.S. Broad Market ETF",
+    rationale: "Broad U.S. equity beta similar to total-market funds; use as an alternative brand to diversify providers.",
+  },
+  {
+    ticker: "ITOT",
+    suggestion: "iShares Core S&P Total U.S. Stock Market ETF",
+    rationale: "Core U.S. market exposure; compare fees and tax placement with your existing funds.",
+  },
+  {
+    ticker: "AGG",
+    suggestion: "iShares Core U.S. Aggregate Bond ETF",
+    rationale: "Core bond aggregate exposure; consider duration and rate risk vs your time horizon.",
+  },
+];
+
+function pickBuyIdeasForMock(holdings: HoldingContext[]): AdditionSuggestion[] {
+  const held = new Set(holdings.map((h) => h.symbol.toUpperCase().trim()));
+  const picked: AdditionSuggestion[] = [];
+  for (const item of MOCK_BUY_POOL) {
+    if (held.has(item.ticker.toUpperCase())) continue;
+    picked.push({ ...item });
+    if (picked.length >= 3) break;
+  }
+  if (picked.length < 2) {
+    for (const item of MOCK_BUY_POOL) {
+      if (picked.some((p) => p.ticker === item.ticker)) continue;
+      picked.push({ ...item });
+      if (picked.length >= 2) break;
+    }
+  }
+  return picked;
+}
+
+function buildHoldingsToReview(
+  topHoldings: HoldingContext[],
+): HoldingRecommendation[] | undefined {
+  const out: HoldingRecommendation[] = [];
+  for (const h of topHoldings) {
+    if (out.length >= 3) break;
+    const w = h.weight ?? 0;
+    if (w > HIGH_CONCENTRATION_THRESHOLD) {
+      out.push({
+        ticker: h.symbol,
+        action: w > CONCENTRATION_THRESHOLD ? "CONSIDER_REDUCING" : "HOLD",
+        reason: `This position is about ${(w * 100).toFixed(1)}% of the portfolio — review whether that matches your target weight and risk tolerance.`,
+      });
+    }
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +431,24 @@ export class MockReportGenerator implements IReportGenerator {
       risks,
     );
 
+    const rebalancingSteps: string[] = [];
+    if (topSector && topSector.weight > SECTOR_CONCENTRATION_THRESHOLD) {
+      rebalancingSteps.push(
+        `If ${topSector.name} is above your target allocation, consider trimming gradually and moving proceeds toward sectors that better match your plan.`,
+      );
+    }
+    if (holdings.length < DIVERSIFICATION_MIN_HOLDINGS) {
+      rebalancingSteps.push(
+        "Over time, consider building toward a broader set of core holdings or broad-market ETFs so no single name drives most of the outcome.",
+      );
+    }
+
+    const actionPlan: ActionPlan = {
+      holdingsToReview: buildHoldingsToReview(topHoldings),
+      potentialAdditions: pickBuyIdeasForMock(holdings),
+      rebalancingSteps: rebalancingSteps.length > 0 ? rebalancingSteps : undefined,
+    };
+
     return {
       summary,
       strengths: strengths.length > 0 ? strengths : ["Analysis in progress."],
@@ -341,6 +459,7 @@ export class MockReportGenerator implements IReportGenerator {
           ? suggestedActions
           : ["Continue monitoring your portfolio performance."],
       followUpQuestions,
+      actionPlan,
     };
   }
 

@@ -2,7 +2,7 @@
  * Portfolio Analysis Module
  *
  * This module provides AI-powered portfolio analysis with:
- * - Pluggable provider architecture (mock, OpenAI)
+ * - OpenAI-only report generation (see generator.ts; mock removed from production path)
  * - Structured report generation
  * - Future-ready input extensibility (news, filings)
  *
@@ -15,7 +15,7 @@
  *
  * CONFIGURATION
  * ─────────────
- * - ANALYSIS_PROVIDER: "mock" | "openai"
+ * - ANALYSIS_PROVIDER: "openai" (default)
  * - OPENAI_API_KEY: Required for OpenAI provider
  * - OPENAI_ANALYSIS_MODEL: Model to use (default: gpt-4o)
  */
@@ -43,6 +43,5 @@ export {
   isRealGeneratorAvailable,
 } from "./generator";
 
-// Providers (for direct use or testing)
-export { MockReportGenerator } from "./mock-generator";
+// Direct OpenAI implementation (tests may import mock-generator from its path)
 export { OpenAIReportGenerator } from "./openai-generator";
