@@ -1,18 +1,57 @@
-import { Activity, Radio, Zap } from "lucide-react";
+import { Activity, Layers, Radio, Shield, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MarketTodaySnapshot } from "@/server/services/market-snapshot.service";
+import type { HeadlineTheme, MarketTodaySnapshot } from "@/server/services/market-snapshot.service";
 
 type Props = {
   snapshot: MarketTodaySnapshot;
 };
+
+function headlineThemeLabel(t: HeadlineTheme): string {
+  const labels: Record<HeadlineTheme, string> = {
+    macro: "Macro",
+    tech: "Tech",
+    earnings: "Earnings",
+    energy: "Energy",
+    finance: "Financials",
+    general: "Markets",
+  };
+  return labels[t];
+}
 
 function formatPct(n: number): string {
   const sign = n >= 0 ? "+" : "";
   return `${sign}${n.toFixed(2)}%`;
 }
 
+const THEME_ORDER: HeadlineTheme[] = [
+  "macro",
+  "tech",
+  "earnings",
+  "energy",
+  "finance",
+  "general",
+];
+
 export function MarketToday({ snapshot }: Props) {
-  const { tiles, blendChangePct, mood, moodLabel, drivers } = snapshot;
+  const {
+    tiles,
+    blendChangePct,
+    mood,
+    moodLabel,
+    vix,
+    narrativeLines,
+    drivers,
+  } = snapshot;
+
+  const driversByTheme = drivers.reduce<Partial<Record<HeadlineTheme, typeof drivers>>>(
+    (acc, d) => {
+      const list = acc[d.theme] ?? [];
+      list.push(d);
+      acc[d.theme] = list;
+      return acc;
+    },
+    {},
+  );
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-muted/40 p-5 shadow-sm">
@@ -27,27 +66,53 @@ export function MarketToday({ snapshot }: Props) {
             </div>
             <div>
               <h2 className="text-sm font-semibold tracking-tight">Market pulse</h2>
-              <p className="text-[11px] text-muted-foreground">Session proxies · now</p>
+              <p className="text-[11px] text-muted-foreground">
+                Proxies + rotation + what headlines imply
+              </p>
             </div>
           </div>
 
-          <div
-            className={cn(
-              "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium",
-              mood === "up" &&
-                "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-              mood === "down" && "bg-rose-500/15 text-rose-700 dark:text-rose-400",
-              mood === "mixed" && "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {vix != null && (
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                  vix.changePct >= 0.3
+                    ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                    : "border-muted bg-muted/40 text-muted-foreground",
+                )}
+              >
+                <Shield className="h-3 w-3" />
+                <span className="font-mono">VIX</span>
+                <span className="text-foreground">{vix.price.toFixed(2)}</span>
+                <span
+                  className={cn(
+                    vix.changePct >= 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400",
+                  )}
+                >
+                  {formatPct(vix.changePct)}
+                </span>
+              </div>
             )}
-          >
-            <Activity className="h-3.5 w-3.5" />
-            {!Number.isNaN(blendChangePct) ? (
-              <span>{formatPct(blendChangePct)} avg</span>
-            ) : (
-              <span>No live quotes</span>
-            )}
-            <span className="text-muted-foreground">·</span>
-            <span>{moodLabel}</span>
+
+            <div
+              className={cn(
+                "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium",
+                mood === "up" &&
+                  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+                mood === "down" && "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+                mood === "mixed" && "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+              )}
+            >
+              <Activity className="h-3.5 w-3.5" />
+              {!Number.isNaN(blendChangePct) ? (
+                <span>{formatPct(blendChangePct)} avg</span>
+              ) : (
+                <span>No live quotes</span>
+              )}
+              <span className="text-muted-foreground">·</span>
+              <span>{moodLabel}</span>
+            </div>
           </div>
         </div>
 
@@ -101,21 +166,57 @@ export function MarketToday({ snapshot }: Props) {
           )}
         </div>
 
+        {/* Why the tape — structured explanations */}
+        <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+          <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <Layers className="h-3.5 w-3.5" />
+            Why it’s moving (read)
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {narrativeLines.map((line) => (
+              <div
+                key={line.id}
+                className="rounded-lg border bg-background/70 p-3 shadow-sm"
+              >
+                <div className="text-xs font-semibold leading-tight text-foreground">
+                  {line.title}
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {line.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <Zap className="h-3 w-3" />
-            Signal stack
+            Headline map (auto-tagged)
           </div>
-          <div className="flex flex-wrap gap-2">
-            {drivers.map((d) => (
-              <span
-                key={d.id}
-                className="max-w-[340px] truncate rounded-lg border bg-background/80 px-2.5 py-1.5 text-[11px] leading-snug text-foreground/90 shadow-sm backdrop-blur-sm"
-                title={d.label}
-              >
-                {d.label}
-              </span>
-            ))}
+          <div className="space-y-3">
+            {THEME_ORDER.map((theme) => {
+              const list = driversByTheme[theme];
+              if (!list?.length) return null;
+              return (
+                <div key={theme}>
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/90">
+                    {headlineThemeLabel(theme)}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {list.map((d) => (
+                      <span
+                        key={d.id}
+                        className="max-w-full sm:max-w-[340px] truncate rounded-lg border bg-background/85 px-2.5 py-1.5 text-[11px] leading-snug text-foreground/90 shadow-sm backdrop-blur-sm"
+                        title={d.label}
+                      >
+                        {d.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
