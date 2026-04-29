@@ -18,14 +18,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/dashboard/stat-card";
-import { PerformanceChart } from "@/components/charts/performance-chart";
+import { MarketToday } from "@/components/dashboard/market-today";
 import { AllocationChart } from "@/components/charts/allocation-chart";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import {
   computePortfolioStats,
   MOCK_HOLDINGS,
-  MOCK_PERFORMANCE_SERIES,
 } from "@/lib/mock-data";
+import { getMarketTodaySnapshot } from "@/server/services/market-snapshot.service";
 import { getSession } from "@/lib/auth";
 import { enrichmentService, type PortfolioView } from "@/server/services/enrichment.service";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
@@ -77,6 +77,13 @@ async function getDashboardState(): Promise<DashboardState> {
 
 export default async function DashboardPage() {
   const state = await getDashboardState();
+
+  let marketSnapshot = null as Awaited<ReturnType<typeof getMarketTodaySnapshot>> | null;
+  try {
+    marketSnapshot = await getMarketTodaySnapshot();
+  } catch (e) {
+    console.error("[dashboard] market snapshot:", e);
+  }
 
   // Show empty state for logged-in users with no portfolios
   if (state.type === "empty") {
@@ -254,17 +261,17 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* ── Charts row ─────────────────────────────────────────────────── */}
+      {/* ── Market pulse + allocation ───────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Performance</CardTitle>
-            <CardDescription>Portfolio value over the last 12 months.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <PerformanceChart data={MOCK_PERFORMANCE_SERIES} />
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-2">
+          {marketSnapshot ? (
+            <MarketToday snapshot={marketSnapshot} />
+          ) : (
+            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+              Market snapshot unavailable.
+            </div>
+          )}
+        </div>
 
         <Card>
           <CardHeader>

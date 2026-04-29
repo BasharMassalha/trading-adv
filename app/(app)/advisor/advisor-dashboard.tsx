@@ -37,6 +37,7 @@ import {
   type NewsBundleView,
 } from "./portfolio-news-section";
 import type { ReportView, InvestorProfileView } from "@/server/services/analysis.service";
+import { TickerContextDrawer } from "@/components/advisor/ticker-context-drawer";
 
 type PortfolioSummary = {
   id: string;
@@ -72,6 +73,7 @@ export function AdvisorDashboard({
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pulseTicker, setPulseTicker] = useState<string | null>(null);
 
   async function generateAnalysis() {
     if (!portfolio) return;
@@ -229,7 +231,7 @@ export function AdvisorDashboard({
 
         <TabsContent value="report" className="mt-6">
           {latestReport ? (
-            <ReportDisplay report={latestReport} />
+            <ReportDisplay report={latestReport} onTickerPulse={setPulseTicker} />
           ) : (
             <EmptyReportState
               readiness={readiness}
@@ -274,6 +276,11 @@ export function AdvisorDashboard({
         AI analysis is informational only — not financial advice. Always do your
         own research before making investment decisions.
       </p>
+
+      <TickerContextDrawer
+        ticker={pulseTicker}
+        onClose={() => setPulseTicker(null)}
+      />
     </div>
   );
 }
@@ -327,7 +334,13 @@ function EmptyReportState({
   );
 }
 
-function ReportDisplay({ report }: { report: ReportView }) {
+function ReportDisplay({
+  report,
+  onTickerPulse,
+}: {
+  report: ReportView;
+  onTickerPulse: (ticker: string) => void;
+}) {
   return (
     <div className="space-y-6">
       {/* Summary */}
@@ -387,28 +400,70 @@ function ReportDisplay({ report }: { report: ReportView }) {
                   {report.actionPlan.holdingsToReview.map((h, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 rounded-lg border bg-background p-3"
+                      className="flex flex-col gap-3 rounded-lg border bg-background p-3"
                     >
-                      <Badge
-                        variant={
-                          h.action === "CONSIDER_SELLING"
-                            ? "destructive"
-                            : h.action === "CONSIDER_REDUCING"
-                              ? "warning"
-                              : h.action === "CONSIDER_ADDING"
-                                ? "success"
-                                : "secondary"
-                        }
-                        className="shrink-0"
-                      >
-                        {h.ticker}
-                      </Badge>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">
-                          {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
+                      <div className="flex items-start gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            h.ticker && h.ticker !== "BLEND"
+                              ? onTickerPulse(h.ticker)
+                              : undefined
+                          }
+                          className="shrink-0 rounded-md outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                          disabled={!h.ticker || h.ticker === "BLEND"}
+                        >
+                          <Badge
+                            variant={
+                              h.action === "CONSIDER_SELLING"
+                                ? "destructive"
+                                : h.action === "CONSIDER_REDUCING"
+                                  ? "warning"
+                                  : h.action === "CONSIDER_ADDING"
+                                    ? "success"
+                                    : "secondary"
+                            }
+                            className="cursor-pointer font-mono text-xs hover:opacity-90"
+                          >
+                            {h.ticker}
+                          </Badge>
+                        </button>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">
+                            {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">{h.reason}</p>
+                          {!h.ticker || h.ticker === "BLEND" ? null : (
+                            <button
+                              type="button"
+                              onClick={() => onTickerPulse(h.ticker)}
+                              className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                            >
+                              What’s moving lately →
+                            </button>
+                          )}
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">{h.reason}</p>
                       </div>
+                      {(h.todoItems?.length ?? 0) > 0 && (
+                        <div className="border-t border-border/60 pt-3">
+                          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            To-do
+                          </div>
+                          <ul className="space-y-1.5">
+                            {(h.todoItems ?? []).map((task, ti) => (
+                              <li
+                                key={ti}
+                                className="flex gap-2 text-sm leading-snug text-foreground/90"
+                              >
+                                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mono text-[10px] font-semibold text-primary">
+                                  {ti + 1}
+                                </span>
+                                <span>{task}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

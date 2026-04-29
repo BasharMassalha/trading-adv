@@ -150,6 +150,8 @@ export type HoldingRecommendation = {
   ticker: string;
   action: "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING";
   reason: string;
+  /** Ordered checklist for this holding (AI-generated; may be empty on legacy reports). */
+  todoItems: string[];
 };
 
 /** Suggestion for adding to portfolio (ETF or stock symbol + rationale) */
@@ -163,7 +165,7 @@ export type AdditionSuggestion = {
 
 /** Actionable plan with specific recommendations */
 export type ActionPlan = {
-  /** Holdings to review with specific actions */
+  /** Holdings to review — each row should include todoItems checklist */
   holdingsToReview?: HoldingRecommendation[];
   /** 2–5 tickers to consider buying/researching (aligned with profile; not duplicates of current holdings) */
   potentialAdditions: AdditionSuggestion[];

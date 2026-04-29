@@ -186,21 +186,46 @@ function pickBuyIdeasForMock(holdings: HoldingContext[]): AdditionSuggestion[] {
 }
 
 function buildHoldingsToReview(
-  topHoldings: HoldingContext[],
+  portfolio: PortfolioContext,
 ): HoldingRecommendation[] | undefined {
-  const out: HoldingRecommendation[] = [];
-  for (const h of topHoldings) {
-    if (out.length >= 3) break;
-    const w = h.weight ?? 0;
-    if (w > HIGH_CONCENTRATION_THRESHOLD) {
-      out.push({
-        ticker: h.symbol,
-        action: w > CONCENTRATION_THRESHOLD ? "CONSIDER_REDUCING" : "HOLD",
-        reason: `This position is about ${(w * 100).toFixed(1)}% of the portfolio — review whether that matches your target weight and risk tolerance.`,
-      });
-    }
+  const MIN_WEIGHT = 0.02;
+  const sorted = [...portfolio.holdings]
+    .filter((h) => (h.weight ?? 0) >= MIN_WEIGHT)
+    .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+
+  const targets =
+    sorted.length > 0 ? sorted.slice(0, 14) : getTopHoldings(portfolio.holdings, 5);
+
+  if (targets.length === 0) {
+    return undefined;
   }
-  return out.length > 0 ? out : undefined;
+
+  return targets.map((h) => {
+    const w = h.weight ?? 0;
+    let action: HoldingRecommendation["action"] = "HOLD";
+    if (w > CONCENTRATION_THRESHOLD) {
+      action = "CONSIDER_REDUCING";
+    } else if (w > HIGH_CONCENTRATION_THRESHOLD) {
+      action = "HOLD";
+    }
+
+    const reason =
+      w > HIGH_CONCENTRATION_THRESHOLD
+        ? `${h.symbol} is about ${(w * 100).toFixed(1)}% of the book — size and volatility deserve an explicit plan.`
+        : `${h.symbol} is a core line at ${(w * 100).toFixed(1)}% — verify the thesis still matches your profile.`;
+
+    return {
+      ticker: h.symbol,
+      action,
+      reason,
+      todoItems: [
+        `Reconcile ${h.symbol} weight with your written max position rule`,
+        `Skim the last 2 weeks of headlines or filings for thesis leaks`,
+        `Define the next action: trim, hold through volatility, or add on weakness`,
+        `Schedule a calendar reminder to re-check after the next major macro print`,
+      ],
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +469,7 @@ export class MockReportGenerator implements IReportGenerator {
     }
 
     const actionPlan: ActionPlan = {
-      holdingsToReview: buildHoldingsToReview(topHoldings),
+      holdingsToReview: buildHoldingsToReview(portfolio),
       potentialAdditions: pickBuyIdeasForMock(holdings),
       rebalancingSteps: rebalancingSteps.length > 0 ? rebalancingSteps : undefined,
     };

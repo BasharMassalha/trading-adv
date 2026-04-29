@@ -230,6 +230,38 @@ export const newsService = {
   },
 
   /**
+   * Recent headlines for a single ticker (advisor pulse / market context).
+   */
+  async getPulseForTicker(
+    ticker: string,
+    options?: { limit?: number; daysBack?: number },
+  ): Promise<{
+    items: import("@/lib/news/types").NewsItem[];
+    warnings: string[];
+    provider: string;
+  }> {
+    const raw = ticker.replace(/^\^/, "").trim().toUpperCase();
+    if (!raw || raw === "BLEND") {
+      return { items: [], warnings: [], provider: "none" };
+    }
+
+    const provider = getNewsProvider();
+    const limit = options?.limit ?? 6;
+    const daysBack = options?.daysBack ?? 7;
+
+    const result = await provider.getRecentNewsForTicker(raw, {
+      limit,
+      daysBack,
+    });
+
+    return {
+      items: result.articles.map((a) => ({ ...a, ticker: raw })),
+      warnings: result.warnings,
+      provider: result.provider ?? getNewsProviderName(),
+    };
+  },
+
+  /**
    * Get important holdings that would be used for news retrieval.
    * Useful for debugging or display.
    */

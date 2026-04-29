@@ -127,4 +127,12 @@ export const portfolioService = {
       });
     });
   },
+
+  async deleteForUser(userId: string, portfolioId: string) {
+    const existing = await portfolioRepository.findById(portfolioId);
+    if (!existing || existing.userId !== userId) {
+      throw new NotFoundError("Portfolio not found.");
+    }
+    await portfolioRepository.delete(portfolioId);
+  },
 };

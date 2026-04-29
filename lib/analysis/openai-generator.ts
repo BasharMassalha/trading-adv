@@ -44,20 +44,28 @@ const analysisReportSchema = z.object({
   followUpQuestions: z.array(z.string().min(10).max(300)).min(1).max(5),
   actionPlan: z.object({
     holdingsToReview: z
-      .array(
-        z.object({
-          ticker: z.string().min(1).max(10),
-          action: z.enum([
-            "CONSIDER_SELLING",
-            "CONSIDER_REDUCING",
-            "HOLD",
-            "CONSIDER_ADDING",
-          ]),
-          reason: z.string().min(10).max(300),
-        }),
-      )
-      .max(7)
-      .optional(),
+      .preprocess(
+        (v) => (v === null ? undefined : v),
+        z
+          .array(
+            z.object({
+              ticker: z.string().min(1).max(10),
+              action: z.enum([
+                "CONSIDER_SELLING",
+                "CONSIDER_REDUCING",
+                "HOLD",
+                "CONSIDER_ADDING",
+              ]),
+              reason: z.string().min(10).max(400),
+              todoItems: z
+                .array(z.string().min(8).max(220))
+                .min(3)
+                .max(8),
+            }),
+          )
+          .max(14)
+          .optional(),
+      ),
     potentialAdditions: z
       .array(
         z.object({
@@ -76,14 +84,16 @@ const analysisReportSchema = z.object({
 // Prompt building
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an expert portfolio research assistant. Produce SPECIFIC, ACTIONABLE analysis grounded in portfolio data, investor profile, RECENT NEWS (when provided), and SEC filings (when provided).
+const SYSTEM_PROMPT = `You are an expert portfolio research assistant. Produce SPECIFIC, DIRECT analysis grounded in portfolio data, investor profile, RECENT NEWS (when provided), and SEC filings (when provided).
+
+TONE: Be confident and prioritised — clear "first / next" steps, sharp calls on what to watch, and plain-English verdicts. Still informational only (no guarantees, no "you must buy/sell" absolutes). Prefer decisive framing: "Prioritise…", "First step…", "Main risk:…" while staying within facts supplied.
 
 CRITICAL RULES:
 1. NEVER fabricate values, prices, or statistics not in the input
 2. NEVER assume market events unless they appear in newsContext or filingsContext
-3. NEVER guarantee returns or give definitive financial advice
-4. Use cautious language: "consider", "may want to review", "based on available data"
-5. Be explicit when data is incomplete
+3. NEVER guarantee returns or promise outcomes
+4. Be explicit when data is incomplete
+5. Avoid generic filler — every bullet should tie to tickers, weights, news, or filings when possible
 
 NEWS — GIVE IT STRONG WEIGHT WHEN PRESENT:
 - When "Recent News Context" is non-empty, treat it as a FIRST-CLASS input alongside portfolio weights and performance (not an afterthought).
@@ -103,8 +113,13 @@ BUY / RESEARCH IDEAS (REQUIRED):
 - actionPlan.potentialAdditions MUST have between 2 and 5 items.
 - Each item MUST include: ticker (real US-listed symbol), suggestion (short name of the security), rationale (why it could fit this portfolio and profile).
 - Every ticker in potentialAdditions MUST NOT appear in the current portfolio holdings list.
-- Prefer diversified ETFs and established names that align with the investor profile (risk, horizon, goal, sector prefs). Use cautious framing: "consider", "may want to research", not guarantees.
+- Prefer diversified ETFs and established names that align with the investor profile (risk, horizon, goal, sector prefs). Frame as research/watchlist ideas, not promises.
 - If the portfolio is already broad, suggest complementary sleeves (e.g. international, bonds, sector balance) with appropriate symbols.
+
+HOLDING TO-DO LISTS (REQUIRED when portfolio has holdings):
+- actionPlan.holdingsToReview MUST be present with at least 1 row when there is any holding.
+- Cover EVERY position with weight >= 2% with its own row (ticker + action + reason + todoItems). Positions under 2% may be grouped into a single row with ticker "BLEND" or the largest micro-holding ticker plus a note in reason.
+- Each row MUST include "todoItems": 3-7 short, imperative tasks (e.g. "Re-read last earnings call summary", "Set a trim rule if weight exceeds 12%"). Tasks must be specific to that ticker/context, not generic investing advice.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching the schema. No markdown, no prose, no code blocks.`;
@@ -242,7 +257,12 @@ Analyze this portfolio and return a JSON object with the following structure:
       {
         "ticker": "AAPL",
         "action": "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING",
-        "reason": "Specific reason based on data (concentration, performance, news, filings)"
+        "reason": "Specific reason based on data (concentration, performance, news, filings)",
+        "todoItems": [
+          "Compare current weight vs your max single-stock rule",
+          "Scan last 2 weeks of headlines for execution risk",
+          "Decide trim size if concentration breaches plan"
+        ]
       }
     ],
     "potentialAdditions": [
@@ -265,10 +285,11 @@ Analyze this portfolio and return a JSON object with the following structure:
 }
 
 IMPORTANT RULES FOR actionPlan:
-- holdingsToReview: Optional; 0-7 rows for existing positions that need attention (overweight, underperforming, news concerns)
+- holdingsToReview: REQUIRED when portfolio has holdings — include a row (with todoItems) for every position-weight >= 2% as above; max 14 rows.
+- Each holdingsToReview row MUST include todoItems (3-7 strings).
 - potentialAdditions: REQUIRED — 2-5 tickers the user could consider buying or researching next. Each row must have ticker + suggestion + rationale; no ticker may duplicate a symbol already in the portfolio.
 - rebalancingSteps: Optional; 2-4 concrete steps in order of priority when useful
-- holdingsToReview must reference tickers that appear in the portfolio
+- holdingsToReview tickers must match portfolio except allowed "BLEND" grouping for tiny positions
 - Connect recommendations to the data (concentration %, performance, news, filings)
 
 If Recent News Context above is non-empty:
@@ -383,7 +404,7 @@ export class OpenAIReportGenerator implements IReportGenerator {
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
-        max_tokens: 3500,
+        max_tokens: 5000,
         temperature: 0.3, // Lower temperature for more consistent output
         messages: [
           { role: "system", content: SYSTEM_PROMPT },

@@ -36,6 +36,7 @@ export type HoldingRecommendation = {
   ticker: string;
   action: "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING";
   reason: string;
+  todoItems: string[];
 };
 
 export type AdditionSuggestion = {
@@ -93,7 +94,14 @@ function toReportView(report: AIReport): ReportView {
       const plan = raw.actionPlan as Record<string, unknown>;
       actionPlan = {
         holdingsToReview: Array.isArray(plan.holdingsToReview)
-          ? (plan.holdingsToReview as HoldingRecommendation[])
+          ? (plan.holdingsToReview as Record<string, unknown>[]).map((h) => ({
+              ticker: String(h.ticker ?? ""),
+              action: h.action as HoldingRecommendation["action"],
+              reason: String(h.reason ?? ""),
+              todoItems: Array.isArray(h.todoItems)
+                ? (h.todoItems as unknown[]).map((t) => String(t))
+                : [],
+            }))
           : undefined,
         potentialAdditions: Array.isArray(plan.potentialAdditions)
           ? (plan.potentialAdditions as AdditionSuggestion[])

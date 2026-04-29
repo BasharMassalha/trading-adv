@@ -41,6 +41,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { EmptyPortfolioDetail } from "@/components/empty-states";
 import { EnrichButton } from "./enrich-button";
+import { DeletePortfolioButton } from "./delete-portfolio-button";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Portfolio" };
@@ -108,6 +109,7 @@ export default async function PortfolioViewPage({
               AI advisor
             </Link>
           </Button>
+          <DeletePortfolioButton portfolioId={params.id} portfolioName={view.name} />
           <EnrichButton
             portfolioId={params.id}
             lastEnrichedAt={view.lastEnrichedAt}
