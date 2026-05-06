@@ -38,6 +38,7 @@ import {
 } from "./portfolio-news-section";
 import type { ReportView, InvestorProfileView } from "@/server/services/analysis.service";
 import { TickerContextDrawer } from "@/components/advisor/ticker-context-drawer";
+import { HoldingsSlideshow } from "@/components/advisor/holdings-slideshow";
 
 type PortfolioSummary = {
   id: string;
@@ -74,6 +75,7 @@ export function AdvisorDashboard({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulseTicker, setPulseTicker] = useState<string | null>(null);
+  const [showSlideshow, setShowSlideshow] = useState(false);
 
   async function generateAnalysis() {
     if (!portfolio) return;
@@ -139,7 +141,7 @@ export function AdvisorDashboard({
             Personalized portfolio analysis and recommendations
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="gap-1">
             <FileText className="h-3 w-3" />
             {portfolio.name}
@@ -150,6 +152,20 @@ export function AdvisorDashboard({
               Report ready
             </Badge>
           )}
+          {latestReport?.actionPlan?.holdingsToReview &&
+            latestReport.actionPlan.holdingsToReview.some(
+              (h) => h.ticker && h.ticker !== "BLEND",
+            ) && (
+              <Button
+                size="sm"
+                variant="default"
+                className="gap-1.5"
+                onClick={() => setShowSlideshow(true)}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Walk through stocks
+              </Button>
+            )}
         </div>
       </div>
 
@@ -280,6 +296,16 @@ export function AdvisorDashboard({
       <TickerContextDrawer
         ticker={pulseTicker}
         onClose={() => setPulseTicker(null)}
+      />
+
+      <HoldingsSlideshow
+        open={showSlideshow}
+        onClose={() => setShowSlideshow(false)}
+        holdings={latestReport?.actionPlan?.holdingsToReview ?? []}
+        onTickerPulse={(t) => {
+          setShowSlideshow(false);
+          setPulseTicker(t);
+        }}
       />
     </div>
   );
@@ -429,18 +455,36 @@ function ReportDisplay({
                           </Badge>
                         </button>
                         <div className="flex-1">
-                          <div className="text-sm font-medium">
-                            {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-medium">
+                              {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
+                            </div>
+                            {h.verdict && (
+                              <Badge
+                                variant="outline"
+                                className="font-mono text-[10px] tracking-wide"
+                              >
+                                {h.verdict}
+                                {h.conviction ? ` · ${h.conviction[0]}-conv` : ""}
+                              </Badge>
+                            )}
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground">{h.reason}</p>
                           {!h.ticker || h.ticker === "BLEND" ? null : (
-                            <button
-                              type="button"
-                              onClick={() => onTickerPulse(h.ticker)}
-                              className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline"
-                            >
-                              What’s moving lately →
-                            </button>
+                            <div className="mt-2 flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => onTickerPulse(h.ticker)}
+                                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                              >
+                                What’s moving lately →
+                              </button>
+                              {(h.thesis || (h.bullCase?.length ?? 0) > 0) && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  Tap “Walk through stocks” for the full read
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

@@ -203,10 +203,13 @@ function buildHoldingsToReview(
   return targets.map((h) => {
     const w = h.weight ?? 0;
     let action: HoldingRecommendation["action"] = "HOLD";
+    let verdict: HoldingRecommendation["verdict"] = "HOLD";
     if (w > CONCENTRATION_THRESHOLD) {
       action = "CONSIDER_REDUCING";
+      verdict = "TRIM";
     } else if (w > HIGH_CONCENTRATION_THRESHOLD) {
       action = "HOLD";
+      verdict = "HOLD";
     }
 
     const reason =
@@ -214,16 +217,53 @@ function buildHoldingsToReview(
         ? `${h.symbol} is about ${(w * 100).toFixed(1)}% of the book — size and volatility deserve an explicit plan.`
         : `${h.symbol} is a core line at ${(w * 100).toFixed(1)}% — verify the thesis still matches your profile.`;
 
+    const gainNote =
+      h.unrealizedGainLossPct != null
+        ? `Unrealized P/L is ${pct(h.unrealizedGainLossPct)}.`
+        : "Unrealized P/L unavailable until prices are refreshed.";
+
     return {
       ticker: h.symbol,
       action,
       reason,
-      todoItems: [
-        `Reconcile ${h.symbol} weight with your written max position rule`,
-        `Skim the last 2 weeks of headlines or filings for thesis leaks`,
-        `Define the next action: trim, hold through volatility, or add on weakness`,
-        `Schedule a calendar reminder to re-check after the next major macro print`,
+      verdict,
+      conviction: w > CONCENTRATION_THRESHOLD ? "MEDIUM" : "MEDIUM",
+      thesis: `${h.symbol} (${h.sector ?? "sector pending"}) is held at ${(w * 100).toFixed(1)}% weight. ${gainNote} A real-AI run will replace this stub with a fundamental view.`,
+      bullCase: [
+        `Existing position with cost basis already established`,
+        `Sized at ${(w * 100).toFixed(1)}% — manageable without a forced sale`,
       ],
+      bearCase: [
+        w > HIGH_CONCENTRATION_THRESHOLD
+          ? `Concentration risk: single-name volatility could move the whole book`
+          : `Single-name idiosyncratic risk regardless of size`,
+        `Mock view does not include real-time fundamentals`,
+      ],
+      catalysts: [
+        `Next earnings report`,
+        `Sector-level macro datapoint (rates, demand)`,
+      ],
+      recentDevelopments: [
+        `Mock generator: no live filings or news ingested for this report.`,
+      ],
+      risks: [
+        `Position sizing relative to total book`,
+        `Sector beta if ${h.sector ?? "sector"} sees rotation`,
+      ],
+      todoItems: [
+        `Set price alert at a level that would change your mind`,
+        `Decide trim or add size in advance, not in the moment`,
+      ],
+      earningsHighlight: {
+        lastReportPeriod: "Last quarter",
+        surpriseLabel: "UNKNOWN",
+        story: `${h.symbol} earnings details aren't available in this mock run — connect Yahoo and OpenAI to see the actual print, surprise %, and call takeaways here.`,
+        nextWatchPoints: [
+          "Top-line growth vs guide",
+          "Margin direction",
+          "Forward guidance / commentary",
+        ],
+      },
     };
   });
 }

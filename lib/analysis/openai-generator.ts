@@ -28,6 +28,7 @@ import type {
   InvestorProfileContext,
   NewsItem,
   FilingItem,
+  EarningsItem,
 } from "./types";
 import { AnalysisProviderError } from "./types";
 
@@ -49,7 +50,7 @@ const analysisReportSchema = z.object({
         z
           .array(
             z.object({
-              ticker: z.string().min(1).max(10),
+              ticker: z.string().min(1).max(12),
               action: z.enum([
                 "CONSIDER_SELLING",
                 "CONSIDER_REDUCING",
@@ -57,10 +58,33 @@ const analysisReportSchema = z.object({
                 "CONSIDER_ADDING",
               ]),
               reason: z.string().min(10).max(400),
-              todoItems: z
-                .array(z.string().min(8).max(220))
-                .min(3)
-                .max(8),
+              verdict: z
+                .enum(["BUY", "ACCUMULATE", "HOLD", "TRIM", "SELL", "WATCH"])
+                .optional(),
+              conviction: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
+              thesis: z.string().min(20).max(600).optional(),
+              bullCase: z.array(z.string().min(8).max(260)).max(6).optional(),
+              bearCase: z.array(z.string().min(8).max(260)).max(6).optional(),
+              catalysts: z.array(z.string().min(8).max(220)).max(6).optional(),
+              recentDevelopments: z
+                .array(z.string().min(10).max(280))
+                .max(6)
+                .optional(),
+              risks: z.array(z.string().min(8).max(260)).max(6).optional(),
+              todoItems: z.array(z.string().min(8).max(220)).max(8).optional(),
+              earningsHighlight: z
+                .object({
+                  lastReportDate: z.string().optional(),
+                  lastReportPeriod: z.string().max(20).optional(),
+                  surpriseLabel: z
+                    .enum(["BEAT", "MET", "MISSED", "UNKNOWN"])
+                    .optional(),
+                  surprisePct: z.number().optional(),
+                  story: z.string().min(15).max(500).optional(),
+                  nextReportDate: z.string().optional(),
+                  nextWatchPoints: z.array(z.string().min(6).max(180)).max(5).optional(),
+                })
+                .optional(),
             }),
           )
           .max(14)
@@ -106,6 +130,14 @@ NEWS — GIVE IT STRONG WEIGHT WHEN PRESENT:
 FILINGS:
 - When filingsContext exists, SEC disclosures outrank news for the same company; still use both.
 
+EARNINGS — REQUIRED WHEN earningsContext IS NON-EMPTY:
+- For every ticker that appears in earningsContext, fill the holding's "earningsHighlight" object so the user understands the latest earnings call without doing the work themselves.
+- Required fields (when data is present): lastReportDate, lastReportPeriod, surpriseLabel ("BEAT" | "MET" | "MISSED" | "UNKNOWN"), surprisePct (rounded to 1 decimal when known).
+- "story": 1-2 sentence plain-English explanation. Use the actual EPS / revenue numbers and surprise %. Tie the result to the verdict where it makes sense (e.g. "EPS beat by 4.2% on AI-driven services revenue, supporting our HOLD with upward bias").
+- "nextReportDate": echo Yahoo's next date verbatim if provided.
+- "nextWatchPoints": 2-4 SHORT items (each <= 12 words) about what investors should listen for in the upcoming call (margins, guide, segment growth, capex).
+- If a ticker has earnings data with surpriseLabel === "UNKNOWN" or no actuals, set surpriseLabel: "UNKNOWN" and put a one-line story explaining that the latest report didn't have actuals yet — do not invent numbers.
+
 ACTIONABLE OUTPUT:
 - Name SPECIFIC TICKERS; connect news and filings to named holdings and to actionPlan reasons.
 
@@ -116,10 +148,24 @@ BUY / RESEARCH IDEAS (REQUIRED):
 - Prefer diversified ETFs and established names that align with the investor profile (risk, horizon, goal, sector prefs). Frame as research/watchlist ideas, not promises.
 - If the portfolio is already broad, suggest complementary sleeves (e.g. international, bonds, sector balance) with appropriate symbols.
 
-HOLDING TO-DO LISTS (REQUIRED when portfolio has holdings):
-- actionPlan.holdingsToReview MUST be present with at least 1 row when there is any holding.
-- Cover EVERY position with weight >= 2% with its own row (ticker + action + reason + todoItems). Positions under 2% may be grouped into a single row with ticker "BLEND" or the largest micro-holding ticker plus a note in reason.
-- Each row MUST include "todoItems": 3-7 short, imperative tasks (e.g. "Re-read last earnings call summary", "Set a trim rule if weight exceeds 12%"). Tasks must be specific to that ticker/context, not generic investing advice.
+PER-HOLDING DEEP RESEARCH (REQUIRED when portfolio has holdings):
+You — not the user — are responsible for the underlying research. The user should not be told to "review the 10-Q", "evaluate concentration risk", or "consider sector developments". YOU do that work in this report and present the findings.
+
+For every position with weight >= 2% (and up to 14 rows total), produce one entry in actionPlan.holdingsToReview with all of the following:
+  - ticker: string (real symbol; for grouped tiny positions you may use "BLEND")
+  - action: one of "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING"
+  - reason: ONE sentence summary of why
+  - verdict: one of "BUY" | "ACCUMULATE" | "HOLD" | "TRIM" | "SELL" | "WATCH"
+  - conviction: "HIGH" | "MEDIUM" | "LOW" — your honest confidence in the verdict given available data
+  - thesis: 2-3 sentence investment thesis as you see it RIGHT NOW (cite weight, recent news, or filings where applicable)
+  - bullCase: 2-4 short bullet points (positive drivers, durable advantages, growth, valuation if applicable)
+  - bearCase: 2-4 short bullet points (concrete risks, deteriorating signals, headwinds)
+  - catalysts: 2-4 upcoming events / signals that would CHANGE the verdict ("Q3 earnings", "AI capex guidance", "regulatory ruling")
+  - recentDevelopments: 2-5 specific findings from the news/filings provided (e.g. "10-Q reported margin compression in Cloud", "8-K disclosed CFO change"). If filings/news for that ticker were not provided, write a short item like "Limited recent disclosures in input — verdict uses portfolio metrics + general profile only" instead of inventing items.
+  - risks: 2-4 risks specific to THIS holding (not generic investing risks)
+  - todoItems: 0-5 EXECUTION steps the USER still owns, e.g. "Set price alert at $X", "Decide trim size if weight > 12%". DO NOT include research tasks like "review 10-Q" — that is OUR job and should be in recentDevelopments.
+
+Holdings under 2% weight may be combined as one "BLEND" row with action/reason/verdict (no per-name thesis required).
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching the schema. No markdown, no prose, no code blocks.`;
@@ -208,6 +254,18 @@ ${investorProfile.notes ? `- Notes: ${investorProfile.notes}` : ""}`);
 No investor profile has been configured. Analysis will be general without personalization.`);
   }
 
+  // Earnings context — last actual + next date so the model can write a per-stock earnings story
+  if (input.earningsContext && input.earningsContext.length > 0) {
+    sections.push(`\n## Earnings Context (HIGH PRIORITY for per-holding earningsHighlight)
+Yahoo-derived data per ticker. Use this to fill earningsHighlight for each holding row. Numbers below are real — do not invent figures, but you may interpret what they mean.`);
+    for (const e of input.earningsContext.slice(0, 14)) {
+      sections.push(formatEarningsEvent(e));
+    }
+  } else {
+    sections.push(`\n## Earnings Context
+No earnings data was retrieved. earningsHighlight may be omitted on holdings, but if a ticker has highly relevant earnings news in the news context, you may still write a 1-sentence story (with surpriseLabel set to "UNKNOWN").`);
+  }
+
   // SEC Filings context - primary source company disclosures
   if (filingsContext && filingsContext.length > 0) {
     sections.push(`\n## SEC Filings Context
@@ -258,11 +316,26 @@ Analyze this portfolio and return a JSON object with the following structure:
         "ticker": "AAPL",
         "action": "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING",
         "reason": "Specific reason based on data (concentration, performance, news, filings)",
-        "todoItems": [
-          "Compare current weight vs your max single-stock rule",
-          "Scan last 2 weeks of headlines for execution risk",
-          "Decide trim size if concentration breaches plan"
-        ]
+        "verdict": "BUY" | "ACCUMULATE" | "HOLD" | "TRIM" | "SELL" | "WATCH",
+        "conviction": "HIGH" | "MEDIUM" | "LOW",
+        "thesis": "Two to three sentence investment thesis as we see it now.",
+        "bullCase": ["…", "…"],
+        "bearCase": ["…", "…"],
+        "catalysts": ["…", "…"],
+        "recentDevelopments": [
+          "Findings extracted from the news/filings supplied above (NOT a task for the user)."
+        ],
+        "risks": ["…"],
+        "todoItems": ["Set price alert at $X", "Decide trim size if weight > 12%"],
+        "earningsHighlight": {
+          "lastReportDate": "2025-08-01",
+          "lastReportPeriod": "Q2 2025",
+          "surpriseLabel": "BEAT",
+          "surprisePct": 4.2,
+          "story": "Reported Q2 EPS of $1.32 vs $1.27 estimate (+4.2%) on services strength; gross margin held at 46%.",
+          "nextReportDate": "2025-10-30",
+          "nextWatchPoints": ["AI capex guide", "China revenue", "Services growth durability"]
+        }
       }
     ],
     "potentialAdditions": [
@@ -285,8 +358,10 @@ Analyze this portfolio and return a JSON object with the following structure:
 }
 
 IMPORTANT RULES FOR actionPlan:
-- holdingsToReview: REQUIRED when portfolio has holdings — include a row (with todoItems) for every position-weight >= 2% as above; max 14 rows.
-- Each holdingsToReview row MUST include todoItems (3-7 strings).
+- holdingsToReview: REQUIRED when portfolio has holdings — include a row for every position with weight >= 2%; max 14 rows.
+- Every holdingsToReview row MUST include verdict, conviction, thesis, bullCase, bearCase, catalysts, recentDevelopments, and risks.
+- recentDevelopments must be the ANALYST's findings extracted from the news/filings sections above. Never use it to ask the user to read filings or news themselves.
+- todoItems are EXECUTION steps for the user (alerts, sizing rules, decision triggers); do NOT put research tasks there.
 - potentialAdditions: REQUIRED — 2-5 tickers the user could consider buying or researching next. Each row must have ticker + suggestion + rationale; no ticker may duplicate a symbol already in the portfolio.
 - rebalancingSteps: Optional; 2-4 concrete steps in order of priority when useful
 - holdingsToReview tickers must match portfolio except allowed "BLEND" grouping for tiny positions
@@ -299,6 +374,32 @@ If Recent News Context above is non-empty:
 Return ONLY the JSON object, no other text.`);
 
   return sections.join("\n");
+}
+
+function formatEarningsEvent(e: EarningsItem): string {
+  const parts: string[] = [];
+  parts.push(`### [${e.ticker}] Latest earnings`);
+  if (e.lastReportPeriod || e.lastReportDate) {
+    parts.push(
+      `- Period: ${e.lastReportPeriod ?? "Unknown"}${e.lastReportDate ? ` (reported ${e.lastReportDate.slice(0, 10)})` : ""}`,
+    );
+  }
+  if (e.epsActual != null || e.epsEstimate != null) {
+    parts.push(
+      `- EPS: actual ${e.epsActual?.toFixed?.(2) ?? "n/a"} vs estimate ${e.epsEstimate?.toFixed?.(2) ?? "n/a"}${
+        e.surprisePct != null ? ` (surprise ${e.surprisePct >= 0 ? "+" : ""}${e.surprisePct.toFixed(1)}%)` : ""
+      }${e.surpriseLabel ? ` — ${e.surpriseLabel}` : ""}`,
+    );
+  }
+  if (e.revenueActual != null || e.revenueEstimate != null) {
+    parts.push(
+      `- Revenue: actual ${formatCurrency(e.revenueActual ?? null)} vs estimate ${formatCurrency(e.revenueEstimate ?? null)}`,
+    );
+  }
+  if (e.nextReportDate) {
+    parts.push(`- Next report: ${e.nextReportDate.slice(0, 10)}${e.nextReportTiming ? ` (${e.nextReportTiming})` : ""}`);
+  }
+  return parts.join("\n");
 }
 
 function formatHolding(h: HoldingContext): string {
@@ -404,8 +505,9 @@ export class OpenAIReportGenerator implements IReportGenerator {
     try {
       const response = await this.client.chat.completions.create({
         model: this.model,
-        max_tokens: 5000,
-        temperature: 0.3, // Lower temperature for more consistent output
+        max_tokens: 8000,
+        temperature: 0.3,
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },

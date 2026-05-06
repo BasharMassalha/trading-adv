@@ -18,6 +18,7 @@ import type {
   PortfolioContext,
   NewsItem,
   FilingItem,
+  EarningsItem,
 } from "@/lib/analysis/types";
 import { AnalysisProviderError } from "@/lib/analysis/types";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
@@ -26,17 +27,45 @@ import { aiReportRepository } from "@/server/repositories/ai-report.repository";
 import { enrichmentService, type PortfolioView } from "./enrichment.service";
 import { newsService } from "./news.service";
 import { filingsService } from "./filings.service";
+import { earningsService } from "./earnings.service";
 import type { AIReport, UserInvestmentProfile } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // View types for the frontend
 // ---------------------------------------------------------------------------
 
+export type HoldingVerdict =
+  | "BUY"
+  | "ACCUMULATE"
+  | "HOLD"
+  | "TRIM"
+  | "SELL"
+  | "WATCH";
+
+export type ConvictionLevel = "HIGH" | "MEDIUM" | "LOW";
+
 export type HoldingRecommendation = {
   ticker: string;
   action: "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING";
   reason: string;
-  todoItems: string[];
+  verdict?: HoldingVerdict;
+  conviction?: ConvictionLevel;
+  thesis?: string;
+  bullCase?: string[];
+  bearCase?: string[];
+  catalysts?: string[];
+  recentDevelopments?: string[];
+  risks?: string[];
+  todoItems?: string[];
+  earningsHighlight?: {
+    lastReportDate?: string;
+    lastReportPeriod?: string;
+    surpriseLabel?: "BEAT" | "MET" | "MISSED" | "UNKNOWN";
+    surprisePct?: number;
+    story?: string;
+    nextReportDate?: string;
+    nextWatchPoints?: string[];
+  };
 };
 
 export type AdditionSuggestion = {
@@ -92,15 +121,68 @@ function toReportView(report: AIReport): ReportView {
     const raw = report.rawJson as Record<string, unknown>;
     if (raw.actionPlan && typeof raw.actionPlan === "object") {
       const plan = raw.actionPlan as Record<string, unknown>;
+      const stringArray = (v: unknown): string[] | undefined =>
+        Array.isArray(v)
+          ? (v as unknown[]).map((x) => String(x)).filter((s) => s.trim().length > 0)
+          : undefined;
+
       actionPlan = {
         holdingsToReview: Array.isArray(plan.holdingsToReview)
           ? (plan.holdingsToReview as Record<string, unknown>[]).map((h) => ({
               ticker: String(h.ticker ?? ""),
               action: h.action as HoldingRecommendation["action"],
               reason: String(h.reason ?? ""),
-              todoItems: Array.isArray(h.todoItems)
-                ? (h.todoItems as unknown[]).map((t) => String(t))
-                : [],
+              verdict:
+                typeof h.verdict === "string"
+                  ? (h.verdict as HoldingVerdict)
+                  : undefined,
+              conviction:
+                typeof h.conviction === "string"
+                  ? (h.conviction as ConvictionLevel)
+                  : undefined,
+              thesis:
+                typeof h.thesis === "string" && h.thesis.trim().length > 0
+                  ? String(h.thesis)
+                  : undefined,
+              bullCase: stringArray(h.bullCase),
+              bearCase: stringArray(h.bearCase),
+              catalysts: stringArray(h.catalysts),
+              recentDevelopments: stringArray(h.recentDevelopments),
+              risks: stringArray(h.risks),
+              todoItems: stringArray(h.todoItems) ?? [],
+              earningsHighlight: (() => {
+                const e = h.earningsHighlight;
+                if (!e || typeof e !== "object") return undefined;
+                const eo = e as Record<string, unknown>;
+                const surprise =
+                  typeof eo.surpriseLabel === "string"
+                    ? (eo.surpriseLabel as "BEAT" | "MET" | "MISSED" | "UNKNOWN")
+                    : undefined;
+                return {
+                  lastReportDate:
+                    typeof eo.lastReportDate === "string"
+                      ? eo.lastReportDate
+                      : undefined,
+                  lastReportPeriod:
+                    typeof eo.lastReportPeriod === "string"
+                      ? eo.lastReportPeriod
+                      : undefined,
+                  surpriseLabel: surprise,
+                  surprisePct:
+                    typeof eo.surprisePct === "number"
+                      ? eo.surprisePct
+                      : undefined,
+                  story:
+                    typeof eo.story === "string" && eo.story.trim().length > 0
+                      ? eo.story
+                      : undefined,
+                  nextReportDate:
+                    typeof eo.nextReportDate === "string"
+                      ? eo.nextReportDate
+                      : undefined,
+                  nextWatchPoints: stringArray(eo.nextWatchPoints),
+                };
+              })(),
             }))
           : undefined,
         potentialAdditions: Array.isArray(plan.potentialAdditions)
@@ -293,21 +375,23 @@ export const analysisService = {
       await aiReportRepository.markGenerating(pendingReport.id);
 
       // Load data in parallel
-      const [portfolioView, investorProfile, newsContext, filingsContext] = await Promise.all([
-        enrichmentService.getPortfolioView(portfolioId),
-        investmentProfileRepository.findByUserId(userId),
-        newsService.getNewsForPortfolio(portfolioId, {
-          maxHoldings: 5,
-          articlesPerTicker: 4,
-          maxTotalArticles: 16,
-          daysBack: 7,
-        }),
-        filingsService.getFilingsForPortfolio(portfolioId, {
-          maxHoldings: 5,
-          filingsPerTicker: 3,
-          daysBack: 90,
-        }),
-      ]);
+      const [portfolioView, investorProfile, newsContext, filingsContext, earningsContext] =
+        await Promise.all([
+          enrichmentService.getPortfolioView(portfolioId),
+          investmentProfileRepository.findByUserId(userId),
+          newsService.getNewsForPortfolio(portfolioId, {
+            maxHoldings: 5,
+            articlesPerTicker: 4,
+            maxTotalArticles: 16,
+            daysBack: 7,
+          }),
+          filingsService.getFilingsForPortfolio(portfolioId, {
+            maxHoldings: 5,
+            filingsPerTicker: 3,
+            daysBack: 90,
+          }),
+          earningsService.getEarningsForPortfolio(portfolioId, { maxTickers: 8 }),
+        ]);
 
       // Build input context with source warnings for data quality
       const portfolioContext = portfolioViewToContext(portfolioView);
@@ -376,8 +460,30 @@ export const analysisService = {
         source: item.source,
       }));
 
+      // Convert earnings context to analysis input format
+      const earningsItems: EarningsItem[] = earningsContext.items.map((e) => ({
+        ticker: e.ticker,
+        lastReportDate: e.lastReportDate,
+        lastReportPeriod: e.lastReportPeriod,
+        epsActual: e.epsActual,
+        epsEstimate: e.epsEstimate,
+        surprisePct: e.surprisePct,
+        surpriseLabel: e.surpriseLabel,
+        revenueActual: e.revenueActual,
+        revenueEstimate: e.revenueEstimate,
+        nextReportDate: e.nextReportDate,
+        nextReportTiming: e.nextReportTiming,
+        source: e.source,
+      }));
+
+      if (earningsContext.warnings.length > 0) {
+        for (const w of earningsContext.warnings) {
+          if (!sourceWarnings.includes(w)) sourceWarnings.push(w);
+        }
+      }
+
       console.info(
-        `[analysis] Context: ${portfolioContext.holdingCount} holdings, ${newsItems.length} news, ${filingItems.length} filings`,
+        `[analysis] Context: ${portfolioContext.holdingCount} holdings, ${newsItems.length} news, ${filingItems.length} filings, ${earningsItems.length} earnings`,
       );
 
       const input: AnalysisInput = {
@@ -387,6 +493,7 @@ export const analysisService = {
           : null,
         newsContext: newsItems.length > 0 ? newsItems : undefined,
         filingsContext: filingItems.length > 0 ? filingItems : undefined,
+        earningsContext: earningsItems.length > 0 ? earningsItems : undefined,
         sourceWarnings: sourceWarnings.length > 0 ? sourceWarnings : undefined,
       };
 

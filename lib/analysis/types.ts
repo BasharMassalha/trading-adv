@@ -95,6 +95,24 @@ export type NewsItem = {
 };
 
 /**
+ * Earnings event context — most recent earnings result + next scheduled date.
+ */
+export type EarningsItem = {
+  ticker: string;
+  lastReportDate?: string;
+  lastReportPeriod?: string;
+  epsActual?: number;
+  epsEstimate?: number;
+  surprisePct?: number;
+  surpriseLabel?: "BEAT" | "MET" | "MISSED" | "UNKNOWN";
+  revenueActual?: number;
+  revenueEstimate?: number;
+  nextReportDate?: string;
+  nextReportTiming?: string;
+  source?: string;
+};
+
+/**
  * SEC filing or earnings context for fundamental analysis.
  * This field is optional and designed for future filings retrieval integration.
  */
@@ -134,6 +152,9 @@ export type AnalysisInput = {
   /** SEC filings, earnings reports, and other fundamental data */
   filingsContext?: FilingItem[];
 
+  /** Most recent earnings results + upcoming earnings dates per ticker */
+  earningsContext?: EarningsItem[];
+
   /** Warnings about data retrieval or quality issues */
   sourceWarnings?: string[];
 
@@ -145,13 +166,72 @@ export type AnalysisInput = {
 // Output — the structured report
 // ---------------------------------------------------------------------------
 
-/** Specific holding recommendation in the action plan */
+/**
+ * Verdict the model assigns to a holding after deep research.
+ * BUY = high-conviction add, ACCUMULATE = scale in, HOLD = stay put,
+ * TRIM = reduce size, SELL = exit, WATCH = no action, monitor catalyst.
+ */
+export type HoldingVerdict =
+  | "BUY"
+  | "ACCUMULATE"
+  | "HOLD"
+  | "TRIM"
+  | "SELL"
+  | "WATCH";
+
+export type ConvictionLevel = "HIGH" | "MEDIUM" | "LOW";
+
+/** Specific holding recommendation produced by the analysis engine. */
 export type HoldingRecommendation = {
   ticker: string;
+  /** Coarse legacy action used by the action-plan list. */
   action: "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING";
+  /** One-line rationale for the action. */
   reason: string;
-  /** Ordered checklist for this holding (AI-generated; may be empty on legacy reports). */
-  todoItems: string[];
+  /**
+   * The AI's deep verdict (filled when the report includes per-stock research).
+   * Older reports may omit this.
+   */
+  verdict?: HoldingVerdict;
+  conviction?: ConvictionLevel;
+  /** 2-3 sentence investment thesis as we currently see it. */
+  thesis?: string;
+  /** Concrete bullets supporting the BUY/HOLD case. */
+  bullCase?: string[];
+  /** Concrete bullets supporting the SELL/TRIM/WATCH case. */
+  bearCase?: string[];
+  /** Upcoming events or signals that would change the verdict. */
+  catalysts?: string[];
+  /**
+   * Notable items pulled from filings/news (e.g. "10-Q showed margin
+   * compression in Cloud", "8-K disclosed CFO change"). The AI does this work,
+   * the user does not have to read filings themselves.
+   */
+  recentDevelopments?: string[];
+  /** Specific risks unique to this holding. */
+  risks?: string[];
+  /**
+   * Earnings call summary for this holding written in plain English.
+   * Surfaced as a dedicated card in the per-stock walkthrough.
+   */
+  earningsHighlight?: {
+    /** ISO date of the report covered (last actual). */
+    lastReportDate?: string;
+    /** Human label such as "Q3 2025". */
+    lastReportPeriod?: string;
+    /** "BEAT" / "MET" / "MISSED" / "UNKNOWN" */
+    surpriseLabel?: "BEAT" | "MET" | "MISSED" | "UNKNOWN";
+    /** Surprise % vs estimate when available. */
+    surprisePct?: number;
+    /** 1-2 sentence explanation of what the print said and why it matters. */
+    story?: string;
+    /** ISO date of the next scheduled earnings event. */
+    nextReportDate?: string;
+    /** What to listen for next quarter (e.g. "AI capex guide"). */
+    nextWatchPoints?: string[];
+  };
+  /** Optional execution plan steps the user owns (NOT research tasks). */
+  todoItems?: string[];
 };
 
 /** Suggestion for adding to portfolio (ETF or stock symbol + rationale) */
