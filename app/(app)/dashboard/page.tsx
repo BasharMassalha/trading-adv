@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { MarketToday } from "@/components/dashboard/market-today";
+import { FuturePortfolioProjection } from "@/components/dashboard/future-portfolio-projection";
 import { AllocationChart } from "@/components/charts/allocation-chart";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import {
@@ -29,6 +30,7 @@ import { getMarketTodaySnapshot } from "@/server/services/market-snapshot.servic
 import { getSession } from "@/lib/auth";
 import { enrichmentService, type PortfolioView } from "@/server/services/enrichment.service";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
+import { investmentProfileRepository } from "@/server/repositories/investment-profile.repository";
 import { EmptyDashboard } from "@/components/empty-states";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +43,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 type DashboardState =
   | { type: "anonymous" }
   | { type: "empty" }
-  | { type: "loaded"; data: PortfolioView };
+  | { type: "loaded"; data: PortfolioView; investmentGoal: string | null };
 
 async function getDashboardState(): Promise<DashboardState> {
   const session = await getSession();
@@ -65,7 +67,8 @@ async function getDashboardState(): Promise<DashboardState> {
       return { type: "empty" };
     }
 
-    return { type: "loaded", data };
+    const profile = await investmentProfileRepository.findByUserId(session.userId);
+    return { type: "loaded", data, investmentGoal: profile?.investmentGoal ?? null };
   } catch {
     return { type: "empty" };
   }
@@ -94,6 +97,7 @@ export default async function DashboardPage() {
   // For logged-in users with data, show their real data
   const isAnonymous = state.type === "anonymous";
   const realData = state.type === "loaded" ? state.data : null;
+  const investmentGoal = state.type === "loaded" ? state.investmentGoal : null;
   const usingMock = isAnonymous;
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -260,6 +264,13 @@ export default async function DashboardPage() {
           icon={TrendingDown}
         />
       </div>
+
+      {/* ── Future value (hypothetical) ───────────────────────────────── */}
+      <FuturePortfolioProjection
+        portfolioValue={totalValue}
+        investmentGoal={investmentGoal}
+        isDemo={usingMock}
+      />
 
       {/* ── Market pulse + allocation ───────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-3">
