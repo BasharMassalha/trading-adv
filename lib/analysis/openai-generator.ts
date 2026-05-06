@@ -32,6 +32,9 @@ import type {
 } from "./types";
 import { AnalysisProviderError } from "./types";
 
+/** Max rows in actionPlan.holdingsToReview (schema + prompt). */
+const MAX_HOLDINGS_REVIEW = 14;
+
 // ---------------------------------------------------------------------------
 // Response validation schema
 // ---------------------------------------------------------------------------
@@ -87,7 +90,7 @@ const analysisReportSchema = z.object({
                 .optional(),
             }),
           )
-          .max(14)
+          .max(MAX_HOLDINGS_REVIEW)
           .optional(),
       ),
     potentialAdditions: z
@@ -151,7 +154,9 @@ BUY / RESEARCH IDEAS (REQUIRED):
 PER-HOLDING DEEP RESEARCH (REQUIRED when portfolio has holdings):
 You — not the user — are responsible for the underlying research. The user should not be told to "review the 10-Q", "evaluate concentration risk", or "consider sector developments". YOU do that work in this report and present the findings.
 
-For every position with weight >= 2% (and up to 14 rows total), produce one entry in actionPlan.holdingsToReview with all of the following:
+The user message includes a numbered list **Mandatory holdingsToReview tickers** — you MUST return exactly that many rows (same tickers, same order). Do not stop after a few large positions. If you are tight on length, shorten thesis to 2 sentences and use 2 bullets per array, but do not omit a mandatory ticker.
+
+For every position in that mandatory list (and the same rules for field quality), produce one entry in actionPlan.holdingsToReview with all of the following:
   - ticker: string (real symbol; for grouped tiny positions you may use "BLEND")
   - action: one of "CONSIDER_SELLING" | "CONSIDER_REDUCING" | "HOLD" | "CONSIDER_ADDING"
   - reason: ONE sentence summary of why
@@ -170,8 +175,42 @@ Holdings under 2% weight may be combined as one "BLEND" row with action/reason/v
 OUTPUT FORMAT:
 Return ONLY valid JSON matching the schema. No markdown, no prose, no code blocks.`;
 
-function buildUserPrompt(input: AnalysisInput): string {
+/**
+ * Tickers the model must include in holdingsToReview, in display order.
+ * Heavier names first; reserves one row for BLEND when sub-2% stubs exist.
+ */
+function buildRequiredHoldingsReviewTickers(portfolio: PortfolioContext): string[] {
+  const positive = portfolio.holdings.filter((h) => (h.weight ?? 0) > 0);
+  const sorted = [...positive].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+
+  const main = sorted.filter((h) => (h.weight ?? 0) >= 0.02);
+  const tiny = sorted.filter((h) => (h.weight ?? 0) > 0 && (h.weight ?? 0) < 0.02);
+
+  const maxMain = tiny.length > 0 ? MAX_HOLDINGS_REVIEW - 1 : MAX_HOLDINGS_REVIEW;
+  const selectedMain = main.slice(0, maxMain);
+
+  const tickers = selectedMain
+    .map((h) => h.symbol.trim().toUpperCase())
+    .filter((s) => s.length > 0);
+
+  if (tiny.length > 0 && tickers.length < MAX_HOLDINGS_REVIEW) {
+    tickers.push("BLEND");
+  }
+
+  if (tickers.length === 0 && sorted.length > 0) {
+    return ["BLEND"];
+  }
+
+  return tickers;
+}
+
+function buildUserPromptBundle(input: AnalysisInput): {
+  text: string;
+  requiredHoldingsTickers: string[];
+} {
   const { portfolio, investorProfile, newsContext, filingsContext, sourceWarnings } = input;
+
+  const requiredHoldingsTickers = buildRequiredHoldingsReviewTickers(portfolio);
 
   const sections: string[] = [];
 
@@ -185,7 +224,7 @@ function buildUserPrompt(input: AnalysisInput): string {
 - Last Enriched: ${portfolio.lastEnrichedAt ? portfolio.lastEnrichedAt.toISOString() : "Not enriched"}`);
 
   // Recent news — placed early so the model weights it heavily (same articles as the in-app News tab)
-  const MAX_NEWS_IN_PROMPT = 16;
+  const MAX_NEWS_IN_PROMPT = 32;
   if (newsContext && newsContext.length > 0) {
     sections.push(`\n## Recent News Context (HIGH PRIORITY — use throughout your analysis)
 These articles were retrieved for key portfolio positions. Integrate them into the summary, risks, opportunities, suggested actions, and actionPlan. Name tickers. Do not ignore this section.
@@ -258,7 +297,7 @@ No investor profile has been configured. Analysis will be general without person
   if (input.earningsContext && input.earningsContext.length > 0) {
     sections.push(`\n## Earnings Context (HIGH PRIORITY for per-holding earningsHighlight)
 Yahoo-derived data per ticker. Use this to fill earningsHighlight for each holding row. Numbers below are real — do not invent figures, but you may interpret what they mean.`);
-    for (const e of input.earningsContext.slice(0, 14)) {
+    for (const e of input.earningsContext.slice(0, MAX_HOLDINGS_REVIEW)) {
       sections.push(formatEarningsEvent(e));
     }
   } else {
@@ -299,6 +338,26 @@ Do NOT assume or infer company disclosure information not provided.`);
   if (unenrichedCount > 0) {
     sections.push(`\n## Data Quality Note
 ${unenrichedCount} holding(s) are missing market data. Analysis may be incomplete for these positions.`);
+  }
+
+  if (requiredHoldingsTickers.length > 0) {
+    const lines = requiredHoldingsTickers
+      .map((t, i) => `${i + 1}. ${t}`)
+      .join("\n");
+    sections.push(`\n## MANDATORY holdingsToReview coverage (non-negotiable)
+actionPlan.holdingsToReview MUST contain **exactly ${requiredHoldingsTickers.length}** rows with these tickers **in this order** (copy symbols exactly, including BLEND if listed):
+
+${lines}
+
+- One JSON object per line above; do not merge or skip any.
+- If BLEND appears, one row only: aggregate all positions under 2% weight (name them briefly in thesis or recentDevelopments).
+- To fit the response, shorten text fields rather than dropping rows.`);
+
+    if (portfolio.holdingCount > requiredHoldingsTickers.length) {
+      sections.push(
+        `\nNote: Portfolio has ${portfolio.holdingCount} positions; only names above need full rows (smallest slots rolled into BLEND when applicable).`,
+      );
+    }
   }
 
   sections.push(`\n## Task
@@ -358,7 +417,7 @@ Analyze this portfolio and return a JSON object with the following structure:
 }
 
 IMPORTANT RULES FOR actionPlan:
-- holdingsToReview: REQUIRED when portfolio has holdings — include a row for every position with weight >= 2%; max 14 rows.
+- holdingsToReview: REQUIRED — must match **Mandatory holdingsToReview tickers** exactly (count, symbols, order). Max 14 rows.
 - Every holdingsToReview row MUST include verdict, conviction, thesis, bullCase, bearCase, catalysts, recentDevelopments, and risks.
 - recentDevelopments must be the ANALYST's findings extracted from the news/filings sections above. Never use it to ask the user to read filings or news themselves.
 - todoItems are EXECUTION steps for the user (alerts, sizing rules, decision triggers); do NOT put research tasks there.
@@ -373,7 +432,7 @@ If Recent News Context above is non-empty:
 
 Return ONLY the JSON object, no other text.`);
 
-  return sections.join("\n");
+  return { text: sections.join("\n"), requiredHoldingsTickers };
 }
 
 function formatEarningsEvent(e: EarningsItem): string {
@@ -474,6 +533,16 @@ function extractJsonFromResponse(text: string): string {
   return cleaned;
 }
 
+/** Pull missing ticker list from a coverage validation error for retry UX. */
+function extractMissingHoldingsError(err: unknown): string[] | null {
+  if (!(err instanceof AnalysisProviderError)) return null;
+  const d = err.details;
+  if (!d || typeof d !== "object") return null;
+  const m = (d as Record<string, unknown>).missingHoldingsTickers;
+  if (!Array.isArray(m)) return null;
+  return m.filter((x): x is string => typeof x === "string");
+}
+
 // ---------------------------------------------------------------------------
 // Provider implementation
 // ---------------------------------------------------------------------------
@@ -496,42 +565,83 @@ export class OpenAIReportGenerator implements IReportGenerator {
   }
 
   async generate(input: AnalysisInput): Promise<AnalysisReport> {
-    const userPrompt = buildUserPrompt(input);
+    const bundle = buildUserPromptBundle(input);
 
     console.info("[analysis:openai] Starting analysis for portfolio:", input.portfolio.name);
     console.info("[analysis:openai] Model:", this.model);
     console.info("[analysis:openai] Holdings:", input.portfolio.holdingCount);
+    console.info(
+      "[analysis:openai] Required holdingsToReview tickers:",
+      bundle.requiredHoldingsTickers.length,
+    );
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: bundle.text },
+    ];
 
     try {
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        max_tokens: 8000,
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-      });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await this.client.chat.completions.create({
+          model: this.model,
+          max_tokens: 16384,
+          temperature: 0.3,
+          response_format: { type: "json_object" },
+          messages,
+        });
 
-      const rawContent = response.choices[0]?.message?.content;
-      if (!rawContent) {
-        throw new AnalysisProviderError(
-          "Model returned empty response",
-          "INVALID_RESPONSE",
-        );
+        const rawContent = response.choices[0]?.message?.content;
+        if (!rawContent) {
+          throw new AnalysisProviderError(
+            "Model returned empty response",
+            "INVALID_RESPONSE",
+          );
+        }
+
+        console.info("[analysis:openai] Response length:", rawContent.length);
+
+        try {
+          return this.parseAndValidate(rawContent, bundle.requiredHoldingsTickers);
+        } catch (err) {
+          const missing = extractMissingHoldingsError(err);
+          if (
+            attempt === 0 &&
+            missing != null &&
+            missing.length > 0 &&
+            bundle.requiredHoldingsTickers.length > 0
+          ) {
+            console.warn(
+              "[analysis:openai] Retrying — incomplete holdingsToReview:",
+              missing.join(", "),
+            );
+            messages.push({ role: "assistant", content: rawContent });
+            messages.push({
+              role: "user",
+              content: `Your JSON omitted required actionPlan.holdingsToReview rows. Missing ticker(s): ${missing.join(", ")}.
+
+Return the **full** JSON object again from scratch. actionPlan.holdingsToReview MUST have exactly ${bundle.requiredHoldingsTickers.length} rows in this order: ${bundle.requiredHoldingsTickers.join(", ")}.
+
+Keep thesis to at most 2 sentences and bullCase/bearCase/catalysts to 2 bullets each if needed — do not omit any mandatory ticker.`,
+            });
+            continue;
+          }
+          throw err;
+        }
       }
 
-      console.info("[analysis:openai] Response length:", rawContent.length);
-
-      // Parse and validate
-      return this.parseAndValidate(rawContent);
+      throw new AnalysisProviderError(
+        "Analysis failed after retry due to incomplete holdings coverage",
+        "VALIDATION_ERROR",
+      );
     } catch (err) {
       return this.handleApiError(err);
     }
   }
 
-  private parseAndValidate(rawContent: string): AnalysisReport {
+  private parseAndValidate(
+    rawContent: string,
+    requiredHoldingsTickers: string[] = [],
+  ): AnalysisReport {
     const jsonStr = extractJsonFromResponse(rawContent);
 
     let parsed: unknown;
@@ -556,8 +666,26 @@ export class OpenAIReportGenerator implements IReportGenerator {
       );
     }
 
+    const data = result.data;
+    if (requiredHoldingsTickers.length > 0) {
+      const rows = data.actionPlan.holdingsToReview ?? [];
+      const got = new Set(
+        rows.map((r) => r.ticker.trim().toUpperCase()),
+      );
+      const missing = requiredHoldingsTickers.filter(
+        (t) => !got.has(t.trim().toUpperCase()),
+      );
+      if (missing.length > 0) {
+        throw new AnalysisProviderError(
+          `holdingsToReview missing ${missing.length} required ticker(s)`,
+          "VALIDATION_ERROR",
+          { missingHoldingsTickers: missing },
+        );
+      }
+    }
+
     console.info("[analysis:openai] Analysis completed successfully");
-    return result.data;
+    return data;
   }
 
   private handleApiError(err: unknown): never {

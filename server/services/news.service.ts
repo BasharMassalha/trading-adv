@@ -31,7 +31,7 @@ const LARGE_MOVE_THRESHOLD = 5; // 5% price move
 const MAX_ARTICLES_PER_TICKER = 3;
 const MAX_TOTAL_ARTICLES = 10;
 /** Hard cap to protect APIs */
-const MAX_TOTAL_ARTICLES_CAP = 20;
+const MAX_TOTAL_ARTICLES_CAP = 40;
 
 // ---------------------------------------------------------------------------
 // Types

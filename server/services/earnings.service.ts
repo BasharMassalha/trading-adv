@@ -7,7 +7,7 @@ import { getEarningsProvider, getEarningsProviderName } from "@/lib/earnings/pro
 import type { EarningsContext, EarningsEvent } from "@/lib/earnings/types";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
 
-const DEFAULT_MAX_TICKERS = 8;
+const DEFAULT_MAX_TICKERS = 14;
 
 type Options = {
   maxTickers?: number;

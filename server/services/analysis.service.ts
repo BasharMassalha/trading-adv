@@ -380,17 +380,17 @@ export const analysisService = {
           enrichmentService.getPortfolioView(portfolioId),
           investmentProfileRepository.findByUserId(userId),
           newsService.getNewsForPortfolio(portfolioId, {
-            maxHoldings: 5,
+            maxHoldings: 12,
             articlesPerTicker: 4,
-            maxTotalArticles: 16,
+            maxTotalArticles: 32,
             daysBack: 7,
           }),
           filingsService.getFilingsForPortfolio(portfolioId, {
-            maxHoldings: 5,
+            maxHoldings: 12,
             filingsPerTicker: 3,
             daysBack: 90,
           }),
-          earningsService.getEarningsForPortfolio(portfolioId, { maxTickers: 8 }),
+          earningsService.getEarningsForPortfolio(portfolioId, { maxTickers: 14 }),
         ]);
 
       // Build input context with source warnings for data quality
