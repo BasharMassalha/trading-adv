@@ -31,7 +31,9 @@ import { getSession } from "@/lib/auth";
 import { enrichmentService, type PortfolioView } from "@/server/services/enrichment.service";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
 import { investmentProfileRepository } from "@/server/repositories/investment-profile.repository";
+import { aiReportRepository } from "@/server/repositories/ai-report.repository";
 import { EmptyDashboard } from "@/components/empty-states";
+import { buildProjectionReturnAssumption } from "@/lib/projections/assumptions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Dashboard" };
@@ -43,7 +45,13 @@ export const metadata: Metadata = { title: "Dashboard" };
 type DashboardState =
   | { type: "anonymous" }
   | { type: "empty" }
-  | { type: "loaded"; data: PortfolioView; investmentGoal: string | null };
+  | {
+      type: "loaded";
+      data: PortfolioView;
+      investmentGoal: string | null;
+      riskTolerance: string | null;
+      hasLatestAnalysis: boolean;
+    };
 
 async function getDashboardState(): Promise<DashboardState> {
   const session = await getSession();
@@ -68,7 +76,15 @@ async function getDashboardState(): Promise<DashboardState> {
     }
 
     const profile = await investmentProfileRepository.findByUserId(session.userId);
-    return { type: "loaded", data, investmentGoal: profile?.investmentGoal ?? null };
+    const latestReport = await aiReportRepository.findLatestForPortfolio(data.id);
+
+    return {
+      type: "loaded",
+      data,
+      investmentGoal: profile?.investmentGoal ?? null,
+      riskTolerance: profile?.riskTolerance ?? null,
+      hasLatestAnalysis: latestReport != null,
+    };
   } catch {
     return { type: "empty" };
   }
@@ -98,7 +114,16 @@ export default async function DashboardPage() {
   const isAnonymous = state.type === "anonymous";
   const realData = state.type === "loaded" ? state.data : null;
   const investmentGoal = state.type === "loaded" ? state.investmentGoal : null;
+  const riskTolerance = state.type === "loaded" ? state.riskTolerance : null;
+  const hasLatestAnalysis = state.type === "loaded" ? state.hasLatestAnalysis : false;
   const usingMock = isAnonymous;
+
+  const projectionAssumption = buildProjectionReturnAssumption({
+    riskTolerance,
+    investmentGoal,
+    hasLatestAnalysis,
+    isDemo: usingMock,
+  });
 
   // ── Stats ────────────────────────────────────────────────────────────────
   let totalValue: number | null;
@@ -269,6 +294,7 @@ export default async function DashboardPage() {
       <FuturePortfolioProjection
         portfolioValue={totalValue}
         investmentGoal={investmentGoal}
+        assumption={projectionAssumption}
         isDemo={usingMock}
       />
 

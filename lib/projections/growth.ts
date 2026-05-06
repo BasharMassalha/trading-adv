@@ -15,6 +15,7 @@ export type GrowthProjection = {
   startValue: number;
   year5: HorizonProjection;
   year10: HorizonProjection;
+  year20: HorizonProjection;
 };
 
 /** FV = PV × (1 + r)^n */
@@ -51,6 +52,7 @@ export function buildProjection(
     startValue,
     year5: mk(5),
     year10: mk(10),
+    year20: mk(20),
   };
 }
 

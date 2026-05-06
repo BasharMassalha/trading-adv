@@ -25,31 +25,56 @@ function goalPhrase(goal: string | null | undefined): string | null {
 }
 
 /**
- * Build a small qualitative block from projected 10-year outcomes.
+ * Build a small qualitative block from projected outcomes.
+ * Prefer 20-year profit for story tiering when present (longer horizon).
  */
 export function buildLifeImpactBlock(input: {
   startValue: number;
   year10Profit: number;
   year10Value: number;
+  year20Profit?: number;
+  year20Value?: number;
   annualReturnPct: number;
   investmentGoal?: string | null;
 }): LifeImpactBlock {
-  const { startValue, year10Profit, year10Value, annualReturnPct, investmentGoal } =
-    input;
+  const {
+    startValue,
+    year10Profit,
+    annualReturnPct,
+    investmentGoal,
+    year20Profit,
+  } = input;
 
-  const introParts = [
-    `Imagine your portfolio compounded at about ${annualReturnPct}% per year with no deposits or withdrawals — unlikely in the real world, but useful as a thought experiment.`,
-  ];
+  const profitForTier = year20Profit ?? year10Profit;
+  const longHorizon = year20Profit != null;
+
+  const introParts: string[] = [];
+  if (longHorizon) {
+    introParts.push(
+      `At roughly ${annualReturnPct}% per year compounded (no adds or withdrawals), the numbers are a **long-range sketch** — the 20-year column is the furthest stretch. Not a forecast.`,
+    );
+  } else {
+    introParts.push(
+      `Imagine your portfolio compounded at about ${annualReturnPct}% per year with no deposits or withdrawals — unlikely in the real world, but useful as a thought experiment.`,
+    );
+  }
   const g = goalPhrase(investmentGoal);
   if (g) introParts.push(g);
+  if (longHorizon) {
+    introParts.push(
+      "The notes below mainly reflect what **roughly two decades** at this rate could feel like in everyday terms.",
+    );
+  }
   const intro = introParts.join(" ");
 
   const bullets: string[] = [];
-  const p = year10Profit;
+  const p = profitForTier;
 
   if (p <= 0) {
     bullets.push(
-      "At or below break-even over a decade, the lesson is usually risk control and savings rate — not timing the market.",
+      longHorizon
+        ? "At or below break-even over twenty years in this toy model, real portfolios would usually imply a different mix or savings plan — talk it through with your own plan, not this chart."
+        : "At or below break-even over a decade, the lesson is usually risk control and savings rate — not timing the market.",
     );
   } else if (p < 25_000) {
     bullets.push(
