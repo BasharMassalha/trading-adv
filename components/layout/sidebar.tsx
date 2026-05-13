@@ -9,6 +9,7 @@ import {
   Sparkles,
   Settings,
   LineChart,
+  ShieldAlert,
   SquareTerminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ const NAV: NavItem[] = [
   { label: "Upload", href: "/portfolio/upload", icon: Upload },
   { label: "AI Advisor", href: "/advisor", icon: Sparkles },
   { label: "Markets", href: "/markets", icon: LineChart },
+  { label: "Market Risk", href: "/market-risk", icon: ShieldAlert },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
