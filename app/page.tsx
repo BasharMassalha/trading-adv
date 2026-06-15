@@ -13,6 +13,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { clientEnv } from "@/lib/env";
 import { LandingChartShowcase } from "@/components/landing/landing-chart-showcase";
+import { LandingSampleReport } from "@/components/landing/landing-sample-report";
 import { LandingHeroPreview } from "@/components/landing/landing-hero-preview";
 import {
   LandingHeaderNav,
@@ -154,6 +155,8 @@ export default function LandingPage() {
           <LandingChartShowcase />
         </div>
       </section>
+
+      <LandingSampleReport />
 
       <section className="relative z-10 py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-6">

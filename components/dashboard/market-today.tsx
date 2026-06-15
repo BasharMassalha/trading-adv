@@ -116,7 +116,7 @@ export function MarketToday({ snapshot }: Props) {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {tiles.length === 0 ? (
             <div className="col-span-full rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-xs text-muted-foreground">
               Quotes unavailable — check market data settings.

@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AllocationChart } from "@/components/charts/allocation-chart";
-import { PerformanceChart } from "@/components/charts/performance-chart";
+import { PerformanceComparisonChart } from "@/components/charts/performance-comparison-chart";
 import {
   Table,
   TableBody,
@@ -32,12 +32,14 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
-import { MOCK_PERFORMANCE_SERIES } from "@/lib/mock-data";
+import { computeRiskScore } from "@/lib/portfolio/risk-score";
+import { RiskScoreCard } from "@/components/dashboard/risk-score-card";
 import {
   enrichmentService,
   type PortfolioView,
   type HoldingView,
 } from "@/server/services/enrichment.service";
+import { investmentProfileRepository } from "@/server/repositories/investment-profile.repository";
 import { getSession } from "@/lib/auth";
 import { EmptyPortfolioDetail } from "@/components/empty-states";
 import { EnrichButton } from "./enrich-button";
@@ -77,6 +79,23 @@ export default async function PortfolioViewPage({
 
   const isEnriched = view.lastEnrichedAt != null;
   const needsEnrichment = !isEnriched;
+
+  const profile = await investmentProfileRepository.findByUserId(session.userId);
+
+  const performance = isEnriched
+    ? await enrichmentService.getPerformanceComparison(params.id, 365)
+    : null;
+
+  const riskScore = computeRiskScore({
+    holdings: view.holdings.map((h) => ({
+      symbol: h.symbol,
+      type: h.type,
+      weight: h.weight,
+    })),
+    sectorAllocation: view.sectorAllocation,
+    totalValue: view.totalValue,
+    riskTolerance: profile?.riskTolerance ?? null,
+  });
 
   const uniqueSectors = view.sectorAllocation.length;
   const biggestWinner = [...view.holdings].sort(
@@ -172,6 +191,11 @@ export default async function PortfolioViewPage({
         />
       </div>
 
+      {/* ── Risk score ─────────────────────────────────────────────────── */}
+      {isEnriched && view.holdings.length > 0 && (
+        <RiskScoreCard result={riskScore} />
+      )}
+
       {/* ── Tabbed detail ──────────────────────────────────────────────── */}
       <Tabs defaultValue="holdings">
         <TabsList>
@@ -225,15 +249,80 @@ export default async function PortfolioViewPage({
         <TabsContent value="performance">
           <Card>
             <CardHeader>
-              <CardTitle>Performance over time</CardTitle>
+              <CardTitle>Performance vs benchmark</CardTitle>
               <CardDescription>
-                {isEnriched
-                  ? "Portfolio value from stored price history (1 year)."
-                  : "Mock 12-month history — refresh market data for real chart."}
+                {isEnriched && performance && performance.combined.length > 0
+                  ? "Indexed to 100 at start of period. Dashed line is S&P 500 (SPY)."
+                  : "Refresh market data to load price history and benchmark comparison."}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <PerformanceChart data={MOCK_PERFORMANCE_SERIES} />
+            <CardContent className="space-y-4">
+              {isEnriched && performance && performance.combined.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {performance.portfolioReturnPct != null && (
+                      <div>
+                        <span className="text-muted-foreground">Your portfolio: </span>
+                        <span
+                          className={cn(
+                            "font-semibold tabular-nums",
+                            performance.portfolioReturnPct >= 0
+                              ? "text-success"
+                              : "text-destructive",
+                          )}
+                        >
+                          {performance.portfolioReturnPct >= 0 ? "+" : ""}
+                          {formatPercent(performance.portfolioReturnPct)}
+                        </span>
+                      </div>
+                    )}
+                    {performance.benchmarkReturnPct != null && (
+                      <div>
+                        <span className="text-muted-foreground">S&P 500 (SPY): </span>
+                        <span className="font-semibold tabular-nums">
+                          {performance.benchmarkReturnPct >= 0 ? "+" : ""}
+                          {formatPercent(performance.benchmarkReturnPct)}
+                        </span>
+                      </div>
+                    )}
+                    {performance.portfolioReturnPct != null &&
+                      performance.benchmarkReturnPct != null && (
+                        <div>
+                          <span className="text-muted-foreground">Alpha: </span>
+                          <span
+                            className={cn(
+                              "font-semibold tabular-nums",
+                              performance.portfolioReturnPct -
+                                performance.benchmarkReturnPct >=
+                                0
+                                ? "text-success"
+                                : "text-destructive",
+                            )}
+                          >
+                            {performance.portfolioReturnPct -
+                              performance.benchmarkReturnPct >=
+                            0
+                              ? "+"
+                              : ""}
+                            {formatPercent(
+                              performance.portfolioReturnPct -
+                                performance.benchmarkReturnPct,
+                            )}
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                  <PerformanceComparisonChart
+                    data={performance.combined}
+                    benchmarkLabel="S&P 500 (SPY)"
+                  />
+                </>
+              ) : (
+                <p className="py-12 text-center text-sm text-muted-foreground">
+                  No performance history yet. Click &quot;Refresh market data&quot; to
+                  fetch 1-year price history for your holdings.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

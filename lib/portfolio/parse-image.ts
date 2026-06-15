@@ -14,7 +14,7 @@
  * See lib/vision/ for provider implementations.
  */
 
-import { getVisionProvider, VisionProviderError } from "@/lib/vision";
+import { getVisionProvider, VisionProviderError, type VisionErrorCode } from "@/lib/vision";
 import type { ParseResult } from "./parsed-holding";
 
 export type ImageExtractResult = {
@@ -27,6 +27,8 @@ export type ImageExtractResult = {
   confidence?: number;
   /** Number of rows dropped due to validation errors */
   droppedRows?: number;
+  /** Set when extraction failed before parsing (e.g. rate limit, bad API key) */
+  errorCode?: VisionErrorCode;
 };
 
 /**
@@ -146,6 +148,7 @@ export async function extractHoldingsFromImage(
         status: "empty",
         provider: provider.name,
         droppedRows: 0,
+        errorCode: err.code,
       };
     }
 

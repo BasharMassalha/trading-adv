@@ -1,6 +1,6 @@
 /**
- * Intraday-style snapshot: major US proxies, optional VIX, rotation math,
- * and headline themes merged from SPY / QQQ / IWM with plain-English "why" lines.
+ * Intraday-style snapshot: major US proxies (SPY, QQQ, DIA, IWM), optional VIX,
+ * rotation math, and headline themes merged from those tickers with plain-English "why" lines.
  */
 
 import { getMarketDataProvider } from "@/lib/market-data/provider";
@@ -38,7 +38,7 @@ export type MarketInsightLine = {
 
 export type MarketTodaySnapshot = {
   tiles: IndexTile[];
-  /** Average of SPY/QQQ/IWM change %; NaN if none */
+  /** Average of loaded proxy ETFs (SPY, QQQ, DIA, IWM) change %; NaN if none */
   blendChangePct: number;
   mood: "up" | "down" | "mixed";
   moodLabel: string;
@@ -53,6 +53,7 @@ export type MarketTodaySnapshot = {
 const PROXIES: { symbol: string; label: string; shortLabel: string }[] = [
   { symbol: "SPY", label: "Large cap core", shortLabel: "S&P" },
   { symbol: "QQQ", label: "Growth & tech-heavy", shortLabel: "Nasdaq" },
+  { symbol: "DIA", label: "DJIA-linked proxy ETF", shortLabel: "Dow" },
   { symbol: "IWM", label: "US small caps", shortLabel: "Russell" },
 ];
 
@@ -292,12 +293,13 @@ export async function getMarketTodaySnapshot(): Promise<MarketTodaySnapshot> {
 
   const allArticles: NewsItem[] = [];
   try {
-    const [spyN, qqqN, iwmN] = await Promise.all([
+    const [spyN, qqqN, diaN, iwmN] = await Promise.all([
       newsService.getPulseForTicker("SPY", { limit: 6, daysBack: 3 }),
       newsService.getPulseForTicker("QQQ", { limit: 5, daysBack: 3 }),
+      newsService.getPulseForTicker("DIA", { limit: 4, daysBack: 3 }),
       newsService.getPulseForTicker("IWM", { limit: 4, daysBack: 3 }),
     ]);
-    allArticles.push(...spyN.items, ...qqqN.items, ...iwmN.items);
+    allArticles.push(...spyN.items, ...qqqN.items, ...diaN.items, ...iwmN.items);
   } catch {
     /* ignore */
   }
@@ -352,7 +354,7 @@ export async function getMarketTodaySnapshot(): Promise<MarketTodaySnapshot> {
       id: "synthetic-1",
       label:
         blendChangePct >= 0
-          ? "Few SPY/QQQ/IWM headlines in feed — focus on rates, USD, and mega-cap flow"
+          ? "Few proxy headlines in feed — focus on rates, USD, and mega-cap flow"
           : "Few headlines in feed — watch volatility, credit, and large-cap earnings revisions",
       theme: "general",
     });

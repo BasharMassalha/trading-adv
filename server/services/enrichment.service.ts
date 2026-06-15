@@ -26,6 +26,7 @@
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 import { getMarketDataProvider, getProviderName } from "@/lib/market-data/provider";
+import type { HistoricalRange } from "@/lib/market-data/types";
 import { assetRepository } from "@/server/repositories/asset.repository";
 import { priceHistoryRepository } from "@/server/repositories/price-history.repository";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
@@ -48,6 +49,46 @@ function wasRecentlyEnriched(lastEnrichedAt: Date | null): boolean {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+function daysToRange(days: number): HistoricalRange {
+  if (days <= 31) return "1M";
+  if (days <= 92) return "3M";
+  if (days <= 182) return "6M";
+  if (days <= 365) return "1Y";
+  if (days <= 730) return "2Y";
+  return "5Y";
+}
+
+function normalizeToIndex(
+  points: { date: string; value: number }[],
+): { date: string; value: number }[] {
+  if (points.length === 0) return [];
+  const base = points[0].value;
+  if (base === 0) return points.map((p) => ({ date: p.date, value: 100 }));
+  return points.map((p) => ({
+    date: p.date,
+    value: Math.round((p.value / base) * 1000) / 10,
+  }));
+}
+
+function returnPctFromIndex(
+  points: { date: string; value: number }[],
+): number | null {
+  if (points.length < 2) return null;
+  const start = points[0].value;
+  const end = points[points.length - 1].value;
+  if (start === 0) return null;
+  return Math.round(((end - start) / start) * 1000) / 10;
+}
+
+export type PerformanceComparison = {
+  portfolio: { date: string; value: number }[];
+  benchmark: { date: string; value: number }[];
+  combined: { date: string; portfolio: number; benchmark?: number }[];
+  benchmarkSymbol: string;
+  portfolioReturnPct: number | null;
+  benchmarkReturnPct: number | null;
+};
 
 // ---------------------------------------------------------------------------
 // View types — what the UI consumes
@@ -464,5 +505,72 @@ export const enrichmentService = {
     return Array.from(dateMap.entries())
       .map(([date, value]) => ({ date, value }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  },
+
+  /**
+   * Portfolio performance indexed to 100 at start, plus S&P 500 (SPY) benchmark.
+   */
+  async getPerformanceComparison(
+    portfolioId: string,
+    daysBack = 365,
+  ): Promise<PerformanceComparison> {
+    const empty: PerformanceComparison = {
+      portfolio: [],
+      benchmark: [],
+      combined: [],
+      benchmarkSymbol: "SPY",
+      portfolioReturnPct: null,
+      benchmarkReturnPct: null,
+    };
+
+    const rawPortfolio = await this.getPerformanceSeries(portfolioId, daysBack);
+    if (rawPortfolio.length === 0) return empty;
+
+    const portfolio = normalizeToIndex(rawPortfolio);
+
+    try {
+      const provider = getMarketDataProvider();
+      const range = daysToRange(daysBack);
+      const spyHistory = await provider.getHistoricalPrices("SPY", range);
+      const spyMap = new Map(spyHistory.map((p) => [p.date, p.close]));
+
+      const benchmarkRaw = rawPortfolio
+        .map(({ date }) => {
+          const close = spyMap.get(date);
+          return close != null ? { date, value: close } : null;
+        })
+        .filter((p): p is { date: string; value: number } => p != null);
+
+      const benchmark = normalizeToIndex(benchmarkRaw);
+
+      const benchmarkByDate = new Map(benchmark.map((p) => [p.date, p.value]));
+      const combined = portfolio.map((p) => ({
+        date: p.date,
+        portfolio: p.value,
+        benchmark: benchmarkByDate.get(p.date),
+      }));
+
+      return {
+        portfolio,
+        benchmark,
+        combined,
+        benchmarkSymbol: "SPY",
+        portfolioReturnPct: returnPctFromIndex(portfolio),
+        benchmarkReturnPct: returnPctFromIndex(benchmark),
+      };
+    } catch (err) {
+      console.warn("[enrichment] Benchmark fetch failed:", err);
+      return {
+        portfolio,
+        benchmark: [],
+        combined: portfolio.map((p) => ({
+          date: p.date,
+          portfolio: p.value,
+        })),
+        benchmarkSymbol: "SPY",
+        portfolioReturnPct: returnPctFromIndex(portfolio),
+        benchmarkReturnPct: null,
+      };
+    }
   },
 };

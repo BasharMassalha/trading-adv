@@ -20,8 +20,10 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { MarketToday } from "@/components/dashboard/market-today";
 import { FuturePortfolioProjection } from "@/components/dashboard/future-portfolio-projection";
+import { RiskScoreCard } from "@/components/dashboard/risk-score-card";
 import { AllocationChart } from "@/components/charts/allocation-chart";
 import { formatCurrency, formatPercent } from "@/lib/utils";
+import { computeRiskScore } from "@/lib/portfolio/risk-score";
 import {
   computePortfolioStats,
   MOCK_HOLDINGS,
@@ -201,6 +203,41 @@ export default async function DashboardPage() {
         .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))[0]
     : null;
 
+  const riskScoreInput = realData
+    ? {
+        holdings: realData.holdings.map((h) => ({
+          symbol: h.symbol,
+          type: h.type,
+          weight: h.weight,
+        })),
+        sectorAllocation: realData.sectorAllocation,
+        totalValue: realData.totalValue,
+        riskTolerance: riskTolerance ?? "MODERATE",
+      }
+    : (() => {
+        const stats = computePortfolioStats(MOCK_HOLDINGS);
+        const sectorMap = MOCK_HOLDINGS.reduce<Record<string, number>>((acc, h) => {
+          const mv = h.quantity * h.price;
+          acc[h.sector] = (acc[h.sector] ?? 0) + mv;
+          return acc;
+        }, {});
+        return {
+          holdings: stats.rows.map((r) => ({
+            symbol: r.symbol,
+            type: "STOCK",
+            weight: stats.totalValue > 0 ? r.marketValue / stats.totalValue : null,
+          })),
+          sectorAllocation: Object.entries(sectorMap).map(([name, value]) => ({
+            name,
+            value,
+          })),
+          totalValue: stats.totalValue,
+          riskTolerance: "MODERATE",
+        };
+      })();
+
+  const riskScore = computeRiskScore(riskScoreInput);
+
   return (
     <div className="space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -296,6 +333,13 @@ export default async function DashboardPage() {
         investmentGoal={investmentGoal}
         assumption={projectionAssumption}
         isDemo={usingMock}
+      />
+
+      {/* ── Risk vs profile ─────────────────────────────────────────────── */}
+      <RiskScoreCard
+        result={riskScore}
+        showAdvisorLink={!isAnonymous}
+        compact={isAnonymous}
       />
 
       {/* ── Market pulse + allocation ───────────────────────────────────── */}

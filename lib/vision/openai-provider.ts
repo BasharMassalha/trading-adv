@@ -178,6 +178,28 @@ function extractJsonFromResponse(text: string): string {
   return cleaned;
 }
 
+const MAX_RATE_LIMIT_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 2000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRetryDelayMs(err: InstanceType<typeof OpenAI.APIError>, attempt: number): number {
+  const retryAfter = err.headers?.get?.("retry-after");
+  if (retryAfter) {
+    const seconds = Number.parseInt(retryAfter, 10);
+    if (!Number.isNaN(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+  }
+  return INITIAL_RETRY_DELAY_MS * 2 ** attempt;
+}
+
+function isRetryableApiError(err: InstanceType<typeof OpenAI.APIError>): boolean {
+  return err.status === 429 || err.status === 503;
+}
+
 // ---------------------------------------------------------------------------
 // Provider implementation
 // ---------------------------------------------------------------------------
@@ -222,34 +244,7 @@ export class OpenAIVisionProvider implements IVisionProvider {
     });
 
     try {
-      const response = await this.client.chat.completions.create({
-        model: "gpt-4o",
-        max_tokens: 4096,
-        messages: [
-          {
-            role: "system",
-            content: SYSTEM_PROMPT,
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${apiMimeType};base64,${base64Image}`,
-                  detail: "high",
-                },
-              },
-              {
-                type: "text",
-                text: USER_PROMPT,
-              },
-            ],
-          },
-        ],
-      });
-
-      const rawContent = response.choices[0]?.message?.content;
+      const rawContent = await this.callVisionApi(base64Image, apiMimeType);
       if (!rawContent) {
         return {
           holdings: [],
@@ -262,11 +257,75 @@ export class OpenAIVisionProvider implements IVisionProvider {
 
       console.info("[vision:openai] Raw response length:", rawContent.length);
 
-      // Parse and validate the response
       return this.parseModelResponse(rawContent, filename);
     } catch (err) {
-      return this.handleApiError(err);
+      this.handleApiError(err);
     }
+  }
+
+  private async callVisionApi(
+    base64Image: string,
+    apiMimeType: ReturnType<typeof getMimeTypeForApi>,
+  ): Promise<string | null> {
+    let lastRateLimitError: InstanceType<typeof OpenAI.APIError> | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+      try {
+        const response = await this.client.chat.completions.create({
+          model: "gpt-4o",
+          max_tokens: 4096,
+          messages: [
+            {
+              role: "system",
+              content: SYSTEM_PROMPT,
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${apiMimeType};base64,${base64Image}`,
+                    detail: "high",
+                  },
+                },
+                {
+                  type: "text",
+                  text: USER_PROMPT,
+                },
+              ],
+            },
+          ],
+        });
+
+        return response.choices[0]?.message?.content ?? null;
+      } catch (err) {
+        if (
+          err instanceof OpenAI.APIError &&
+          isRetryableApiError(err) &&
+          attempt < MAX_RATE_LIMIT_RETRIES
+        ) {
+          lastRateLimitError = err;
+          const waitMs = getRetryDelayMs(err, attempt);
+          console.warn(
+            `[vision:openai] Rate limited (${err.status}), retry ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES} in ${waitMs}ms`,
+          );
+          await delay(waitMs);
+          continue;
+        }
+
+        this.handleApiError(err);
+      }
+    }
+
+    if (lastRateLimitError) {
+      this.handleApiError(lastRateLimitError);
+    }
+
+    throw new VisionProviderError(
+      "OpenAI rate limit exceeded. Please try again later.",
+      "RATE_LIMITED",
+    );
   }
 
   private parseModelResponse(
@@ -357,7 +416,7 @@ export class OpenAIVisionProvider implements IVisionProvider {
     };
   }
 
-  private handleApiError(err: unknown): VisionExtractionResult {
+  private handleApiError(err: unknown): never {
     if (err instanceof OpenAI.APIError) {
       console.error("[vision:openai] API error:", err.status, err.message);
 

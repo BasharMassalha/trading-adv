@@ -33,6 +33,7 @@ type UploadStatus = "idle" | "uploading" | "parsed" | "error";
 type ExtendedParseResult = ParseResult & {
   provider?: string;
   droppedRows?: number;
+  errorCode?: string;
 };
 
 type UploadState = {
@@ -138,6 +139,22 @@ function ParseSummary({
 }) {
   const hasWarnings = result.warnings.length > 0;
   const providerLabel = formatProviderName(result.provider);
+  const isRateLimited = result.errorCode === "RATE_LIMITED";
+  const isServiceError =
+    isRateLimited ||
+    result.errorCode === "NETWORK_ERROR" ||
+    result.errorCode === "INVALID_API_KEY";
+
+  const headline =
+    isRateLimited
+      ? "Vision service is temporarily busy."
+      : result.errorCode === "INVALID_API_KEY"
+        ? "Vision service is not configured."
+        : result.errorCode === "NETWORK_ERROR"
+          ? "Could not reach the vision service."
+          : result.status === "empty"
+            ? "No holdings could be extracted from this file."
+            : `Found ${result.holdings.length} holding${result.holdings.length === 1 ? "" : "s"}`;
 
   return (
     <div className="space-y-3">
@@ -160,9 +177,7 @@ function ParseSummary({
         )}
         <div className="min-w-0 flex-1 space-y-1 text-sm">
           <p className="font-medium">
-            {result.status === "empty"
-              ? "No holdings could be extracted from this file."
-              : `Found ${result.holdings.length} holding${result.holdings.length === 1 ? "" : "s"}`}
+            {headline}
             {result.status === "partial" && (
               <span className="ml-1 text-amber-600"> (some rows skipped)</span>
             )}
@@ -196,7 +211,7 @@ function ParseSummary({
         </div>
       )}
 
-      {result.status === "empty" && result.sourceType === "IMAGE" && (
+      {result.status === "empty" && result.sourceType === "IMAGE" && !isServiceError && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">Tips for better extraction:</p>
           <ul className="mt-1 list-inside list-disc space-y-0.5">
@@ -205,6 +220,13 @@ function ParseSummary({
             <li>Avoid cropping important columns (ticker, shares, price)</li>
             <li>Try CSV export if screenshot extraction fails</li>
           </ul>
+        </div>
+      )}
+
+      {isRateLimited && (
+        <div className="rounded-md border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
+          The request was retried automatically. Wait a minute, then upload again —
+          or use CSV export for an immediate import.
         </div>
       )}
 
@@ -217,7 +239,7 @@ function ParseSummary({
         )}
         <Button variant="outline" onClick={onReset}>
           <Upload className="mr-2 h-4 w-4" />
-          Upload different file
+          {isServiceError ? "Try again" : "Upload different file"}
         </Button>
       </div>
     </div>

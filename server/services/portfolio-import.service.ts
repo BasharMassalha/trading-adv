@@ -20,6 +20,7 @@ import {
 export type ImageParseResult = ParseResult & {
   provider?: string;
   droppedRows?: number;
+  errorCode?: string;
 };
 
 export const portfolioImportService = {
@@ -75,6 +76,7 @@ export const portfolioImportService = {
       status: result.status,
       provider: result.provider,
       droppedRows: result.droppedRows,
+      errorCode: result.errorCode,
     };
   },
 };

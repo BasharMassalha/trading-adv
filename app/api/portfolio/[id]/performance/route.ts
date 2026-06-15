@@ -22,7 +22,7 @@ export const GET = withErrorHandling(
     const rawDays = req.nextUrl.searchParams.get("days");
     const days = rawDays ? Math.min(Math.max(parseInt(rawDays, 10) || 365, 30), 1825) : 365;
 
-    const series = await enrichmentService.getPerformanceSeries(params.id, days);
+    const series = await enrichmentService.getPerformanceComparison(params.id, days);
     return ok(series);
   },
 );
