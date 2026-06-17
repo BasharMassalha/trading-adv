@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Search } from "lucide-react";
+import { Bell, Menu, Search, SquareTerminal } from "lucide-react";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { clientEnv } from "@/lib/env";
 
-export function Topnav() {
+type TopnavProps = {
+  onOpenMobileNav?: () => void;
+};
+
+export function Topnav({ onOpenMobileNav }: TopnavProps) {
   const pathname = usePathname();
   const beginNavigation = useBeginNavigation();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:gap-4 md:px-6">
+      <div className="flex min-w-0 items-center gap-2 md:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          aria-label="Open navigation menu"
+          onClick={onOpenMobileNav}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <Link
+          href="/dashboard"
+          onClick={() => {
+            if (pathname === "/dashboard") return;
+            beginNavigation();
+          }}
+          className="flex min-w-0 items-center gap-2"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <SquareTerminal className="h-4 w-4" />
+          </div>
+          <span className="truncate text-sm font-semibold tracking-tight">
+            {clientEnv.NEXT_PUBLIC_APP_NAME}
+          </span>
+        </Link>
+      </div>
+
       <div className="relative hidden flex-1 md:block md:max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -35,7 +67,7 @@ export function Topnav() {
         />
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-1 sm:gap-2">
         <Button variant="ghost" size="icon" aria-label="Notifications">
           <Bell className="h-4 w-4" />
         </Button>
@@ -57,7 +89,10 @@ export function Topnav() {
               <Link
                 href="/settings"
                 onClick={() => {
-                  if (pathname === "/settings" || pathname.startsWith("/settings/"))
+                  if (
+                    pathname === "/settings" ||
+                    pathname.startsWith("/settings/")
+                  )
                     return;
                   beginNavigation();
                 }}
@@ -69,7 +104,10 @@ export function Topnav() {
               <Link
                 href="/advisor"
                 onClick={() => {
-                  if (pathname === "/advisor" || pathname.startsWith("/advisor/"))
+                  if (
+                    pathname === "/advisor" ||
+                    pathname.startsWith("/advisor/")
+                  )
                     return;
                   beginNavigation();
                 }}

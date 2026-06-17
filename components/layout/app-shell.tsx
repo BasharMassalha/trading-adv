@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topnav } from "@/components/layout/topnav";
+import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 
 /**
  * Full app chrome (sidebar + top nav) for all routes except onboarding,
@@ -10,8 +12,13 @@ import { Topnav } from "@/components/layout/topnav";
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isOnboarding =
     pathname === "/onboarding" || pathname?.startsWith("/onboarding/");
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   if (isOnboarding) {
     return (
@@ -22,8 +29,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen w-full">
       <Sidebar />
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topnav />
+        <Topnav onOpenMobileNav={() => setMobileNavOpen(true)} />
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>
