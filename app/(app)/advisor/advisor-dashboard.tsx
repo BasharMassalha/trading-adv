@@ -96,12 +96,51 @@ export function AdvisorDashboard({
         return;
       }
 
+      // Vercel: analysis runs in background — poll until READY.
+      if (res.status === 202 || json.data?.status === "GENERATING") {
+        const reportId = json.data?.reportId as string | undefined;
+        if (!reportId) {
+          setError("Analysis started but no report id was returned.");
+          return;
+        }
+        await pollUntilReportReady(portfolio.id, reportId);
+      }
+
       router.refresh();
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError(
+        err instanceof Error ? err.message : "Network error. Please try again.",
+      );
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function pollUntilReportReady(
+    portfolioId: string,
+    reportId: string,
+  ): Promise<void> {
+    const maxAttempts = 120; // ~6 minutes at 3s intervals
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const res = await fetch(
+        `/api/portfolio/${portfolioId}/analyze?reportId=${encodeURIComponent(reportId)}`,
+      );
+      const json = await res.json();
+      if (!json.ok) continue;
+
+      const status = json.data?.status ?? json.data?.report?.status;
+      if (status === "READY") return;
+      if (status === "FAILED") {
+        const msg =
+          json.data?.report?.summary ??
+          "Analysis failed. Please try again.";
+        throw new Error(msg);
+      }
+    }
+    throw new Error(
+      "Analysis is taking longer than expected. Please refresh the page in a minute.",
+    );
   }
 
   // ── No portfolio state ───────────────────────────────────────────────────
@@ -280,11 +319,16 @@ export function AdvisorDashboard({
                 className="gap-2"
               >
                 {generating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing… (may take 2–3 min)
+                  </>
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Regenerate analysis
+                  </>
                 )}
-                Regenerate analysis
               </Button>
               {error && (
                 <span className="text-sm text-destructive">{error}</span>
@@ -367,11 +411,16 @@ function EmptyReportState({
           size="lg"
         >
           {generating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Analyzing… (may take 2–3 min)
+            </>
           ) : (
-            <Zap className="h-4 w-4" />
+            <>
+              <Zap className="h-4 w-4" />
+              Generate analysis
+            </>
           )}
-          Generate analysis
         </Button>
 
         {error && (

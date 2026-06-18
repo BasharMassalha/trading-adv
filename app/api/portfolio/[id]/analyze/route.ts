@@ -3,9 +3,16 @@ import { ok, fail, withErrorHandling } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { analysisService } from "@/server/services/analysis.service";
 
+/** GPT-5 analysis can take 2+ minutes — allow up to 5 min on Vercel Pro. */
+export const maxDuration = 300;
+
 /**
  * POST /api/portfolio/[id]/analyze
  * Trigger a new portfolio analysis and generate a report.
+ *
+ * On Vercel, returns 202 immediately and runs the LLM call in the background
+ * (via waitUntil) so the request does not hit the gateway timeout. The client
+ * polls GET ?reportId=… until status is READY or FAILED.
  */
 export const POST = withErrorHandling(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
@@ -16,7 +23,6 @@ export const POST = withErrorHandling(
 
     const portfolioId = params.id;
 
-    // Check readiness
     const readiness = await analysisService.checkAnalysisReadiness({
       userId: session.userId,
       portfolioId,
@@ -31,19 +37,46 @@ export const POST = withErrorHandling(
       );
     }
 
-    // Generate report
-    const report = await analysisService.generateReport({
+    const { reportId, status } = await analysisService.startReportGeneration({
       userId: session.userId,
       portfolioId,
     });
 
+    const run = () =>
+      analysisService.executeReportGeneration({
+        reportId,
+        userId: session.userId,
+        portfolioId,
+      });
+
+    // On Vercel: respond immediately, finish analysis in the background.
+    if (process.env.VERCEL === "1") {
+      const { waitUntil } = await import("@vercel/functions");
+      waitUntil(
+        run().catch((err) => {
+          console.error("[analysis] Background generation failed:", err);
+        }),
+      );
+      return ok(
+        {
+          reportId,
+          status,
+          message:
+            "Analysis started. This may take a few minutes with GPT-5.",
+        },
+        { status: 202 },
+      );
+    }
+
+    // Local dev: block until complete (no gateway timeout).
+    const report = await run();
     return ok(report);
   },
 );
 
 /**
  * GET /api/portfolio/[id]/analyze
- * Check if portfolio is ready for analysis.
+ * Check readiness, or poll an in-flight report via ?reportId=…
  */
 export const GET = withErrorHandling(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
@@ -52,9 +85,24 @@ export const GET = withErrorHandling(
       return fail(401, "UNAUTHORIZED", "Please sign in to continue.");
     }
 
+    const portfolioId = params.id;
+    const reportId = req.nextUrl.searchParams.get("reportId");
+
+    if (reportId) {
+      const report = await analysisService.getReportForUser({
+        userId: session.userId,
+        portfolioId,
+        reportId,
+      });
+      if (!report) {
+        return fail(404, "NOT_FOUND", "Report not found.");
+      }
+      return ok({ report, status: report.status });
+    }
+
     const readiness = await analysisService.checkAnalysisReadiness({
       userId: session.userId,
-      portfolioId: params.id,
+      portfolioId,
     });
 
     return ok(readiness);

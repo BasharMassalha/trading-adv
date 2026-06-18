@@ -17,6 +17,16 @@ export const aiReportRepository = {
   },
 
   /**
+   * Find the most recent report for a portfolio (any status).
+   */
+  findLatestAnyForPortfolio(portfolioId: string): Promise<AIReport | null> {
+    return prisma.aIReport.findFirst({
+      where: { portfolioId },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+
+  /**
    * Find the most recent READY report for a user (any portfolio).
    */
   findLatestForUser(userId: string): Promise<AIReport | null> {

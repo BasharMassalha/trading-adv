@@ -339,23 +339,15 @@ export const analysisService = {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Generate a new portfolio analysis report.
-   *
-   * Flow:
-   *   1. Create a PENDING report record
-   *   2. Load portfolio view + investor profile
-   *   3. Build analysis input context
-   *   4. Call the report generator
-   *   5. Persist the structured report
-   *   6. Return the completed report view
+   * Create a report record and mark it generating. Returns immediately so the
+   * HTTP handler can respond before the (slow) LLM call on serverless hosts.
    */
-  async generateReport(params: {
+  async startReportGeneration(params: {
     userId: string;
     portfolioId: string;
-  }): Promise<ReportView> {
+  }): Promise<{ reportId: string; status: "GENERATING" }> {
     const { userId, portfolioId } = params;
 
-    // Verify portfolio ownership
     const portfolio = await portfolioRepository.findById(portfolioId);
     if (!portfolio) {
       throw new NotFoundError("Portfolio not found.");
@@ -364,17 +356,27 @@ export const analysisService = {
       throw new NotFoundError("Portfolio not found.");
     }
 
-    // Create pending report
     const pendingReport = await aiReportRepository.createPending({
       userId,
       portfolioId,
     });
+    await aiReportRepository.markGenerating(pendingReport.id);
+
+    return { reportId: pendingReport.id, status: "GENERATING" };
+  },
+
+  /**
+   * Run the full analysis pipeline for an existing GENERATING report.
+   * Safe to call from a background task (e.g. Vercel waitUntil).
+   */
+  async executeReportGeneration(params: {
+    reportId: string;
+    userId: string;
+    portfolioId: string;
+  }): Promise<ReportView> {
+    const { reportId, userId, portfolioId } = params;
 
     try {
-      // Mark as generating
-      await aiReportRepository.markGenerating(pendingReport.id);
-
-      // Load data in parallel
       const [portfolioView, investorProfile, newsContext, filingsContext, earningsContext] =
         await Promise.all([
           enrichmentService.getPortfolioView(portfolioId),
@@ -504,7 +506,7 @@ export const analysisService = {
 
       // Persist completed report
       const completedReport = await aiReportRepository.completeReport(
-        pendingReport.id,
+        reportId,
         {
           summary: analysis.summary,
           strengths: analysis.strengths,
@@ -532,7 +534,7 @@ export const analysisService = {
         console.error("[analysis] Unknown error:", err);
       }
 
-      await aiReportRepository.markFailed(pendingReport.id, errorMessage);
+      await aiReportRepository.markFailed(reportId, errorMessage);
 
       // Re-throw with a user-friendly message
       if (err instanceof AnalysisProviderError) {
@@ -565,6 +567,40 @@ export const analysisService = {
       }
       throw err;
     }
+  },
+
+  /**
+   * Synchronous path used in local dev — start + execute in one call.
+   */
+  async generateReport(params: {
+    userId: string;
+    portfolioId: string;
+  }): Promise<ReportView> {
+    const { reportId } = await this.startReportGeneration(params);
+    return this.executeReportGeneration({
+      reportId,
+      userId: params.userId,
+      portfolioId: params.portfolioId,
+    });
+  },
+
+  /**
+   * Fetch a report by id, verifying it belongs to the user's portfolio.
+   */
+  async getReportForUser(params: {
+    userId: string;
+    portfolioId: string;
+    reportId: string;
+  }): Promise<ReportView | null> {
+    const portfolio = await portfolioRepository.findById(params.portfolioId);
+    if (!portfolio || portfolio.userId !== params.userId) {
+      throw new NotFoundError("Portfolio not found.");
+    }
+    const report = await aiReportRepository.findById(params.reportId);
+    if (!report || report.portfolioId !== params.portfolioId) {
+      return null;
+    }
+    return toReportView(report);
   },
 
   // ─────────────────────────────────────────────────────────────────────────
