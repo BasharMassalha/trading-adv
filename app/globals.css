@@ -158,3 +158,89 @@
     transform: scale(1.05);
   }
 }
+
+@keyframes briefing-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.briefing-fade {
+  animation: briefing-fade 0.45s ease-out both;
+}
+
+@keyframes briefing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.briefing-rise {
+  animation: briefing-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes briefing-zoom {
+  from {
+    opacity: 0.6;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.briefing-zoom {
+  animation: briefing-zoom 6s ease-out both;
+}
+
+@keyframes briefing-pan {
+  0% {
+    transform: translate3d(-4%, -3%, 0) scale(1.1);
+  }
+  50% {
+    transform: translate3d(4%, 3%, 0) scale(1.2);
+  }
+  100% {
+    transform: translate3d(-4%, -3%, 0) scale(1.1);
+  }
+}
+
+.briefing-pan {
+  animation: briefing-pan 14s ease-in-out infinite;
+}
+
+@keyframes briefing-eq {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.briefing-eq {
+  transform-origin: bottom;
+  animation: briefing-eq 0.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefing-fade,
+  .briefing-rise,
+  .briefing-zoom,
+  .briefing-pan,
+  .briefing-eq {
+    animation: none;
+  }
+}

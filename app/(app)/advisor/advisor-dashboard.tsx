@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
+  Film,
   FileText,
   Lightbulb,
   Loader2,
@@ -39,6 +40,7 @@ import {
 import type { ReportView, InvestorProfileView } from "@/server/services/analysis.service";
 import { TickerContextDrawer } from "@/components/advisor/ticker-context-drawer";
 import { HoldingsSlideshow } from "@/components/advisor/holdings-slideshow";
+import { BriefingPlayer } from "@/components/advisor/briefing-player";
 
 type PortfolioSummary = {
   id: string;
@@ -76,6 +78,7 @@ export function AdvisorDashboard({
   const [error, setError] = useState<string | null>(null);
   const [pulseTicker, setPulseTicker] = useState<string | null>(null);
   const [showSlideshow, setShowSlideshow] = useState(false);
+  const [showBriefing, setShowBriefing] = useState(false);
 
   async function generateAnalysis() {
     if (!portfolio) return;
@@ -152,13 +155,24 @@ export function AdvisorDashboard({
               Report ready
             </Badge>
           )}
+          {latestReport && (
+            <Button
+              size="sm"
+              variant="default"
+              className="gap-1.5"
+              onClick={() => setShowBriefing(true)}
+            >
+              <Film className="h-3.5 w-3.5" />
+              Watch briefing
+            </Button>
+          )}
           {latestReport?.actionPlan?.holdingsToReview &&
             latestReport.actionPlan.holdingsToReview.some(
               (h) => h.ticker && h.ticker !== "BLEND",
             ) && (
               <Button
                 size="sm"
-                variant="default"
+                variant="outline"
                 className="gap-1.5"
                 onClick={() => setShowSlideshow(true)}
               >
@@ -306,6 +320,14 @@ export function AdvisorDashboard({
           setShowSlideshow(false);
           setPulseTicker(t);
         }}
+      />
+
+      <BriefingPlayer
+        open={showBriefing}
+        onClose={() => setShowBriefing(false)}
+        report={latestReport}
+        portfolioName={portfolio.name}
+        news={newsBundle?.items}
       />
     </div>
   );

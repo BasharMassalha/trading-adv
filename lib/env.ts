@@ -26,6 +26,9 @@ const serverSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_ANALYSIS_MODEL: z.string().optional(),
   OPENAI_CHAT_MODEL: z.string().optional(),
+  // Text-to-speech (briefing narration)
+  OPENAI_TTS_MODEL: z.string().optional(),
+  OPENAI_TTS_VOICE: z.string().optional(),
 
   // Anthropic configuration (future)
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -98,6 +101,8 @@ export function serverEnv() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       OPENAI_ANALYSIS_MODEL: process.env.OPENAI_ANALYSIS_MODEL,
       OPENAI_CHAT_MODEL: process.env.OPENAI_CHAT_MODEL,
+      OPENAI_TTS_MODEL: process.env.OPENAI_TTS_MODEL,
+      OPENAI_TTS_VOICE: process.env.OPENAI_TTS_VOICE,
       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
       ANALYSIS_PROVIDER: process.env.ANALYSIS_PROVIDER,
       VISION_PROVIDER: process.env.VISION_PROVIDER,

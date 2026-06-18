@@ -39,6 +39,28 @@ const MAX_HOLDINGS_REVIEW = 14;
 // Response validation schema
 // ---------------------------------------------------------------------------
 
+/**
+ * Recursively remove `null` values from an object/array tree.
+ *
+ * Models like GPT-5 frequently set optional fields to `null` instead of
+ * omitting them; Zod's `.optional()` treats `null` as a type error, so we
+ * normalise nulls to "absent" before validation. Empty arrays are preserved.
+ */
+function stripNulls(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.filter((v) => v !== null).map(stripNulls);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === null) continue;
+      out[k] = stripNulls(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 const analysisReportSchema = z.object({
   summary: z.string().min(50).max(1000),
   strengths: z.array(z.string().min(10).max(500)).min(1).max(10),
@@ -98,10 +120,10 @@ const analysisReportSchema = z.object({
         z.object({
           ticker: z.string().min(1).max(12),
           suggestion: z.string().min(3).max(200),
-          rationale: z.string().min(10).max(400),
+          rationale: z.string().min(40).max(500),
         }),
       )
-      .min(2)
+      .min(3)
       .max(5),
     rebalancingSteps: z.array(z.string().min(10).max(300)).max(6).optional(),
   }),
@@ -144,12 +166,17 @@ EARNINGS — REQUIRED WHEN earningsContext IS NON-EMPTY:
 ACTIONABLE OUTPUT:
 - Name SPECIFIC TICKERS; connect news and filings to named holdings and to actionPlan reasons.
 
-BUY / RESEARCH IDEAS (REQUIRED):
-- actionPlan.potentialAdditions MUST have between 2 and 5 items.
+BUY / RESEARCH IDEAS (REQUIRED — MUST BE DIVERSE, DEEP, AND PORTFOLIO-SPECIFIC):
+- actionPlan.potentialAdditions MUST have between 4 and 5 items.
 - Each item MUST include: ticker (real US-listed symbol), suggestion (short name of the security), rationale (why it could fit this portfolio and profile).
 - Every ticker in potentialAdditions MUST NOT appear in the current portfolio holdings list.
-- Prefer diversified ETFs and established names that align with the investor profile (risk, horizon, goal, sector prefs). Frame as research/watchlist ideas, not promises.
-- If the portfolio is already broad, suggest complementary sleeves (e.g. international, bonds, sector balance) with appropriate symbols.
+- INCLUDE INDIVIDUAL STOCKS, not just ETFs. At least 3 of the suggestions MUST be specific single-company stocks (real US-listed tickers). You may include AT MOST ONE ETF, and only when a diversified sleeve genuinely fills a real gap (e.g. missing international or bond exposure).
+- DIVERSITY IS MANDATORY: each suggestion must come from a DISTINCT sector/industry. Do not suggest two names from the same sub-industry. Tailor the set to THIS portfolio's specific gaps (under-weighted sectors, missing factors like value/dividends/international/small-cap, or over-concentration to offset).
+- DO NOT DEFAULT TO GENERIC BROAD-MARKET FUNDS. Avoid reflexively suggesting VXUS, VTI, VOO, SPY, QQQ, XLV, or similar unless one of them is clearly the best fit for a specific identified gap — and never more than one fund total.
+- These examples in this prompt are ILLUSTRATIVE ONLY — do not copy them. Choose names based on the actual holdings, sector allocation, news, and investor profile provided below.
+- DEPTH: each rationale must be 2-3 sentences and give a concrete, company-specific thesis — name the business driver, growth or valuation angle, or recent news/earnings, AND state explicitly how it complements or diversifies the existing book. No generic "solid company" or "good diversification" filler.
+- Align picks with the investor profile (risk tolerance, horizon, goal, preferred/avoided sectors and regions). Respect avoided sectors and avoided regions strictly.
+- Frame everything as research/watchlist ideas, not promises.
 
 PER-HOLDING DEEP RESEARCH (REQUIRED when portfolio has holdings):
 You — not the user — are responsible for the underlying research. The user should not be told to "review the 10-Q", "evaluate concentration risk", or "consider sector developments". YOU do that work in this report and present the findings.
@@ -399,14 +426,19 @@ Analyze this portfolio and return a JSON object with the following structure:
     ],
     "potentialAdditions": [
       {
-        "ticker": "VXUS",
-        "suggestion": "Vanguard Total International Stock ETF",
-        "rationale": "Adds non-US exposure if the book is mostly domestic; aligns with diversification goals."
+        "ticker": "COST",
+        "suggestion": "Costco Wholesale Corp.",
+        "rationale": "Individual stock: durable membership model and defensive consumer-staples exposure to balance a tech-heavy book; recent comps remained resilient."
       },
       {
-        "ticker": "XLV",
-        "suggestion": "Health Care Select Sector SPDR Fund",
-        "rationale": "Defensive sector sleeve if tech/consumer weights are high; match risk tolerance before sizing."
+        "ticker": "UNH",
+        "suggestion": "UnitedHealth Group Inc.",
+        "rationale": "Individual stock: adds healthcare exposure the portfolio lacks; steady earnings and cash flow fit a moderate-risk, long-horizon profile."
+      },
+      {
+        "ticker": "VXUS",
+        "suggestion": "Vanguard Total International Stock ETF",
+        "rationale": "Optional ETF sleeve: adds non-US exposure if the book is mostly domestic; aligns with diversification goals."
       }
     ],
     "rebalancingSteps": [
@@ -580,15 +612,36 @@ export class OpenAIReportGenerator implements IReportGenerator {
       { role: "user", content: bundle.text },
     ];
 
+    // GPT-5 / o-series reasoning models use a different parameter surface:
+    // - `max_completion_tokens` instead of `max_tokens`
+    // - only the default temperature (custom temperature/penalties rejected)
+    const isReasoningModel = /^(gpt-5|o\d)/i.test(this.model);
+
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
-        const response = await this.client.chat.completions.create({
+        const baseParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
           model: this.model,
-          max_tokens: 16384,
-          temperature: 0.3,
           response_format: { type: "json_object" },
           messages,
-        });
+        };
+
+        const params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming =
+          isReasoningModel
+            ? {
+                ...baseParams,
+                max_completion_tokens: 16384,
+              }
+            : {
+                ...baseParams,
+                max_tokens: 16384,
+                temperature: 0.55,
+                // Nudge the model away from repeating the same default tickers
+                // (e.g. VXUS/XLV) across regenerations, for more varied ideas.
+                presence_penalty: 0.4,
+                frequency_penalty: 0.3,
+              };
+
+        const response = await this.client.chat.completions.create(params);
 
         const rawContent = response.choices[0]?.message?.content;
         if (!rawContent) {
@@ -655,6 +708,11 @@ Keep thesis to at most 2 sentences and bullCase/bearCase/catalysts to 2 bullets 
         { rawContent: rawContent.slice(0, 500) },
       );
     }
+
+    // Some models (notably GPT-5 / o-series) emit explicit `null` for optional
+    // fields they leave empty, which Zod's `.optional()` rejects. Strip nulls so
+    // those fields are treated as omitted.
+    parsed = stripNulls(parsed);
 
     const result = analysisReportSchema.safeParse(parsed);
     if (!result.success) {
