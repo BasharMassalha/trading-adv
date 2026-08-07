@@ -60,6 +60,13 @@ const serverSchema = z.object({
   // Filings provider configuration
   FILINGS_PROVIDER: z.enum(["mock", "sec", "sec-edgar"]).default("mock"),
 
+  /**
+   * Contact string sent to SEC EDGAR, e.g. "MyApp/1.0 (you@yourdomain.com)".
+   * SEC returns 403 for undeclared agents, so this must be set in every
+   * deployed environment or superinvestor 13F and filings data will be empty.
+   */
+  SEC_USER_AGENT: z.string().optional(),
+
   // Google OAuth (Sign in with Google)
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
@@ -111,6 +118,7 @@ export function serverEnv() {
       NEWS_PROVIDER: process.env.NEWS_PROVIDER,
       NEWS_API_KEY: process.env.NEWS_API_KEY,
       FILINGS_PROVIDER: process.env.FILINGS_PROVIDER,
+      SEC_USER_AGENT: process.env.SEC_USER_AGENT?.trim() || undefined,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID?.trim() || undefined,
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined,
       NODE_ENV: process.env.NODE_ENV,

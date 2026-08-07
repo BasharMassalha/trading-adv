@@ -3,6 +3,12 @@
  * Public data — no API key. Requires a descriptive User-Agent (SEC policy).
  */
 
+import {
+  secHeaders,
+  describeSecFailure,
+  isLikelyUserAgentRejection,
+} from "@/lib/sec/user-agent";
+
 export type Raw13FHolding = {
   cusip: string;
   issuerName: string;
@@ -24,11 +30,9 @@ export type Sec13FFiling = {
 
 const SEC_DATA = "https://data.sec.gov";
 const SEC_WWW = "https://www.sec.gov";
-const SEC_USER_AGENT =
-  process.env.SEC_USER_AGENT?.trim() ||
-  "TradingAdvisor/1.0 (superinvestors@localhost)";
 
 const MIN_INTERVAL_MS = 120;
+const MAX_ATTEMPTS = 3;
 let lastRequestAt = 0;
 
 async function throttle(): Promise<void> {
@@ -38,19 +42,37 @@ async function throttle(): Promise<void> {
   lastRequestAt = Date.now();
 }
 
+/**
+ * Fetch from EDGAR with SEC-compliant headers and backoff.
+ *
+ * A 403 means the User-Agent was refused and retrying will not help, so we
+ * fail fast with an actionable message. Throttling (429) and transient 5xx
+ * responses are retried.
+ */
 async function secFetch(url: string): Promise<Response> {
-  await throttle();
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": SEC_USER_AGENT,
-      Accept: "application/json, text/xml, */*",
-    },
-    next: { revalidate: 60 * 60 * 12 },
-  });
-  if (!res.ok) {
-    throw new Error(`SEC fetch ${res.status} for ${url}`);
+  let lastStatus = 0;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    await throttle();
+    const res = await fetch(url, {
+      headers: secHeaders(),
+      next: { revalidate: 60 * 60 * 12 },
+    });
+
+    if (res.ok) return res;
+    lastStatus = res.status;
+
+    if (isLikelyUserAgentRejection(res.status)) {
+      throw new Error(describeSecFailure(res.status, url));
+    }
+
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt === MAX_ATTEMPTS) break;
+
+    await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
   }
-  return res;
+
+  throw new Error(describeSecFailure(lastStatus, url));
 }
 
 function padCik(cik: string): string {

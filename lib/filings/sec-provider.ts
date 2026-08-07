@@ -20,6 +20,7 @@ import type {
   FilingsQueryResult,
 } from "./types";
 import { FilingsProviderError, RELEVANT_FILING_TYPES } from "./types";
+import { secHeaders } from "@/lib/sec/user-agent";
 
 // ---------------------------------------------------------------------------
 // SEC API response types (vendor-specific, isolated here)
@@ -56,7 +57,6 @@ interface SECTickerEntry {
 // ---------------------------------------------------------------------------
 
 const SEC_BASE_URL = "https://data.sec.gov";
-const SEC_USER_AGENT = "TradingAdvisor/1.0 (contact@example.com)"; // SEC requires user agent
 const MIN_REQUEST_INTERVAL = 150; // ms between requests
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours for ticker-to-CIK map
 
@@ -133,12 +133,7 @@ async function getTickerToCikMap(): Promise<Map<string, { cik: string; name: str
   try {
     const response = await fetch(
       "https://www.sec.gov/files/company_tickers.json",
-      {
-        headers: {
-          "User-Agent": SEC_USER_AGENT,
-          Accept: "application/json",
-        },
-      },
+      { headers: secHeaders("application/json") },
     );
 
     if (!response.ok) {
@@ -217,10 +212,7 @@ export class SECFilingsProvider implements IFilingsProvider {
       // Fetch company submissions
       const submissionsUrl = `${SEC_BASE_URL}/submissions/CIK${companyInfo.cik}.json`;
       const response = await fetch(submissionsUrl, {
-        headers: {
-          "User-Agent": SEC_USER_AGENT,
-          Accept: "application/json",
-        },
+        headers: secHeaders("application/json"),
       });
 
       if (!response.ok) {
