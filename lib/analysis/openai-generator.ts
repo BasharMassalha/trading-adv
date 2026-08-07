@@ -63,7 +63,9 @@ function stripNulls(value: unknown): unknown {
 }
 
 const analysisReportSchema = z.object({
-  summary: z.string().min(50).max(1000),
+  // GPT-5 tends to write longer summaries once news + consensus + strategy
+  // are required; 2000 is the hard ceiling, the prompt asks for ~1200.
+  summary: z.string().min(50).max(2000),
   strengths: z.array(z.string().min(10).max(500)).min(1).max(10),
   risks: z.array(z.string().min(10).max(500)).min(1).max(10),
   opportunities: z.array(z.string().min(10).max(500)).min(1).max(10),
@@ -154,6 +156,7 @@ Your job is to maximise risk-adjusted return WITHIN the investor's stated tolera
 - Every item in suggestedActions and rebalancingSteps must name its RETURN DRIVER — what has to happen for it to pay off, and roughly over what timeframe. "Reduces risk" on its own is not a driver.
 - Rank by expected impact: lead with the change that most moves the portfolio's outcome, not the easiest one.
 - The executive summary MUST state where meaningful upside could come from over the investor's horizon, alongside the main risk. Not risk alone.
+- Keep the summary to ONE tight paragraph (roughly 80–180 words / under 1200 characters). Do not pad it with every holding detail — that belongs in holdingsToReview.
 - All of the above stays inside the guardrails: no guarantees, no invented numbers, and no leverage, derivatives, or trading strategies the profile does not support.
 
 INVESTOR'S OWN STRATEGY MESSAGE:
@@ -476,7 +479,7 @@ ${lines}
   sections.push(`\n## Task
 Analyze this portfolio and return a JSON object with the following structure:
 {
-  "summary": "One-paragraph executive summary (50-200 words)",
+  "summary": "One-paragraph executive summary (80-180 words, under 1200 characters)",
   "strengths": ["Array of 2-5 portfolio strengths"],
   "risks": ["Array of 2-5 potential risks or concerns - BE SPECIFIC about which holdings"],
   "opportunities": ["Array of 2-5 potential improvements - BE SPECIFIC"],
@@ -533,6 +536,9 @@ Analyze this portfolio and return a JSON object with the following structure:
     ]
   }
 }
+
+IMPORTANT RULES FOR summary:
+- Keep "summary" to ONE paragraph, ideally 80–180 words and under 1200 characters. Hard max is 2000. Cover upside + main risk + one news/consensus beat — do not turn it into a full report.
 
 IMPORTANT RULES FOR actionPlan:
 - holdingsToReview: REQUIRED — must match **Mandatory holdingsToReview tickers** exactly (count, symbols, order). Max 14 rows.
