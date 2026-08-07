@@ -29,6 +29,7 @@ import type {
   NewsItem,
   FilingItem,
   EarningsItem,
+  SuperinvestorConsensusItem,
 } from "./types";
 import { AnalysisProviderError } from "./types";
 
@@ -143,6 +144,30 @@ CRITICAL RULES:
 3. NEVER guarantee returns or promise outcomes
 4. Be explicit when data is incomplete
 5. Avoid generic filler — every bullet should tie to tickers, weights, news, or filings when possible
+
+RETURN ORIENTATION — DO NOT DEFAULT TO THE SAFEST PLAN:
+Your job is to maximise risk-adjusted return WITHIN the investor's stated tolerance, not to minimise your chance of being wrong. A report where nearly every verdict is HOLD/WATCH and every idea is "diversify further" is a FAILED analysis, even if nothing in it is incorrect.
+- Calibrate offence to the profile. AGGRESSIVE risk, LONG horizon, or GROWTH goal → actively hunt for places to add, concentrate behind the strongest thesis, and take asymmetric upside. CONSERVATIVE risk, SHORT horizon, or CAPITAL_PRESERVATION → protection leads, but you must still name where return can realistically be added.
+- When risk tolerance is MODERATE or AGGRESSIVE, at least TWO holdingsToReview rows should carry an offensive verdict (BUY or ACCUMULATE) or action CONSIDER_ADDING — unless the data genuinely does not support it, in which case say so explicitly and state what would change your mind. Never manufacture conviction you cannot ground in the data.
+- DO NOT recommend trimming a winner for size alone. Concentration justifies trimming only alongside a real problem you can point to: broken thesis, stretched valuation, deteriorating fundamentals, or a risk limit the investor stated. Otherwise letting a winner compound is a legitimate call — make it and defend it.
+- Reject diversification for its own sake. Adding names that introduce no new return driver dilutes performance; only recommend broadening when you can name the specific risk it removes.
+- Every item in suggestedActions and rebalancingSteps must name its RETURN DRIVER — what has to happen for it to pay off, and roughly over what timeframe. "Reduces risk" on its own is not a driver.
+- Rank by expected impact: lead with the change that most moves the portfolio's outcome, not the easiest one.
+- The executive summary MUST state where meaningful upside could come from over the investor's horizon, alongside the main risk. Not risk alone.
+- All of the above stays inside the guardrails: no guarantees, no invented numbers, and no leverage, derivatives, or trading strategies the profile does not support.
+
+INVESTOR'S OWN STRATEGY MESSAGE:
+- If the user message contains a section titled "INVESTOR'S OWN STRATEGY MESSAGE", treat it as the highest-priority personalisation input. On conflict it OUTRANKS the dropdown profile fields.
+- Follow its explicit instructions on trimming, concentration, themes, and exclusions, and make its objective visible in the summary and the action plan.
+- Push back only against a concrete, named danger in the portfolio data — and when you do, say plainly that you are overriding their stated preference and why.
+
+SUPERINVESTOR CONSENSUS — USE IT WHEN THE SECTION IS NON-EMPTY:
+- Consensus 13F positions are CORROBORATING evidence, never a thesis by themselves. Always pair them with fundamentals, news, or earnings from the input.
+- For every holding that appears in the "already holds" consensus list, reference that fact in the row's thesis or bullCase/bearCase — the investor should learn where they align with smart money and where they stand alone.
+- At least ONE potentialAdditions idea SHOULD come from the consensus "does not hold" list when it fits the profile, naming how many superinvestors report it. The remaining ideas must still satisfy the sector-diversity rules.
+- Never write that a manager "is buying" or "just bought". 13F is a ~45-day-lagged snapshot of what was held on the report date.
+- If the investor is long a name where superinvestors disclose puts, raise it explicitly in risks.
+- A heavily crowded position carries positioning risk — name it when relevant.
 
 NEWS — GIVE IT STRONG WEIGHT WHEN PRESENT:
 - When "Recent News Context" is non-empty, treat it as a FIRST-CLASS input alongside portfolio weights and performance (not an afterthought).
@@ -315,6 +340,21 @@ No recent news was retrieved. Base analysis on portfolio and profile data only. 
 - Preferred Sectors: ${investorProfile.preferredSectors.join(", ") || "Not specified"}
 - Avoided Sectors: ${investorProfile.avoidedSectors.join(", ") || "None specified"}
 ${investorProfile.notes ? `- Notes: ${investorProfile.notes}` : ""}`);
+
+    if (investorProfile.strategyMessage && investorProfile.strategyMessage.trim()) {
+      sections.push(`\n## INVESTOR'S OWN STRATEGY MESSAGE (HIGHEST-PRIORITY PERSONALISATION)
+The investor wrote this themselves to describe their goals, preferences, and strategy. It OUTRANKS the dropdown settings above whenever the two disagree, and it must visibly shape the verdicts, the action plan, and the buy ideas.
+
+"""
+${investorProfile.strategyMessage.trim()}
+"""
+
+How to use it:
+- Mirror their stated objective in the executive summary — the reader should recognise their own words in your plan.
+- Honour explicit instructions: if they say let winners run, do not recommend trimming purely on position size; if they name themes they like, bias potentialAdditions toward those; if they ban something, never suggest it.
+- If they ask for higher returns or say they accept volatility, the plan must contain genuine offence (adds, concentration in the strongest theses, higher-upside ideas), not hedged neutrality.
+- Only override a stated preference when the portfolio data shows a concrete, named danger — and then say plainly why you are pushing back.`);
+    }
   } else {
     sections.push(`\n## Investor Profile
 No investor profile has been configured. Analysis will be general without personalization.`);
@@ -330,6 +370,52 @@ Yahoo-derived data per ticker. Use this to fill earningsHighlight for each holdi
   } else {
     sections.push(`\n## Earnings Context
 No earnings data was retrieved. earningsHighlight may be omitted on holdings, but if a ticker has highly relevant earnings news in the news context, you may still write a 1-sentence story (with surpriseLabel set to "UNKNOWN").`);
+  }
+
+  // Superinvestor 13F consensus — crowd positioning among tracked managers
+  const si = input.superinvestorContext;
+  if (si && (si.longs.length > 0 || si.shorts.length > 0)) {
+    const overlap = si.longs.filter((c) => c.heldByUser);
+    const notHeld = si.longs.filter((c) => !c.heldByUser);
+
+    sections.push(`\n## Superinvestor Consensus (SEC Form 13F — ${si.asOfLabel})
+Positions held by at least ${si.minHolders} of ${si.liveFilerCount} tracked superinvestors (Buffett, Ackman, Burry, Tepper, Griffin, Wood, Coleman, Loeb, Icahn, Druckenmiller and peers). This is REAL filing data, but it is reported with a ~45-day lag and shows long U.S. equities and listed options only — the managers may have already changed these positions.`);
+
+    if (overlap.length > 0) {
+      sections.push(`\n### Consensus names the investor ALREADY HOLDS (${overlap.length})`);
+      for (const c of overlap) {
+        sections.push(formatConsensusRow(c));
+      }
+      sections.push(
+        `Use these to corroborate or challenge your verdict on those holdings — say explicitly when smart money is on the same side, and when it is not.`,
+      );
+    }
+
+    if (notHeld.length > 0) {
+      sections.push(`\n### Consensus names the investor DOES NOT hold (${notHeld.length}) — candidate ideas`);
+      for (const c of notHeld.slice(0, 18)) {
+        sections.push(formatConsensusRow(c));
+      }
+    }
+
+    if (si.shorts.length > 0) {
+      sections.push(`\n### Consensus disclosed PUTS / shorts (${si.shorts.length})`);
+      for (const c of si.shorts) {
+        sections.push(
+          `${formatConsensusRow(c)}${c.heldByUser ? "\n  ⚠ The investor is LONG this name while superinvestors disclose puts — address this directly." : ""}`,
+        );
+      }
+    }
+
+    sections.push(`
+Rules for this section:
+- Treat consensus as a SUPPORTING signal, never the whole thesis. Pair it with the fundamentals, news, or earnings above.
+- Never claim a manager "is buying" or "just bought" — the filing shows what they held as of the report date.
+- Do not suggest a consensus name that sits in an avoided sector or contradicts the investor's strategy message.
+- Crowding cuts both ways: a heavily crowded name carries positioning risk worth naming.`);
+  } else {
+    sections.push(`\n## Superinvestor Consensus
+No superinvestor 13F consensus data was available for this run. Do not reference or invent what any investor holds.`);
   }
 
   // SEC Filings context - primary source company disclosures
@@ -457,6 +543,9 @@ IMPORTANT RULES FOR actionPlan:
 - rebalancingSteps: Optional; 2-4 concrete steps in order of priority when useful
 - holdingsToReview tickers must match portfolio except allowed "BLEND" grouping for tiny positions
 - Connect recommendations to the data (concentration %, performance, news, filings)
+- Verdicts must NOT be uniformly defensive: apply the RETURN ORIENTATION rules and include offence where the data and profile support it
+- Where a ticker appears in the superinvestor consensus section, work that into its thesis/bullCase/bearCase and into at least one potentialAdditions rationale
+- Where the investor supplied a strategy message, its instructions govern the plan and must be visible in summary, suggestedActions, and rebalancingSteps
 
 If Recent News Context above is non-empty:
 - "summary" must mention at least one news-driven theme with ticker(s)
@@ -465,6 +554,13 @@ If Recent News Context above is non-empty:
 Return ONLY the JSON object, no other text.`);
 
   return { text: sections.join("\n"), requiredHoldingsTickers };
+}
+
+function formatConsensusRow(c: SuperinvestorConsensusItem): string {
+  const holders = c.holders.slice(0, 6).join(", ");
+  const more = c.holders.length > 6 ? ` +${c.holders.length - 6} more` : "";
+  return `- ${c.ticker} (${c.name}) — ${c.holderCount} investors, avg ${c.avgWeightPct.toFixed(1)}% of their 13F book
+  Holders: ${holders}${more}`;
 }
 
 function formatEarningsEvent(e: EarningsItem): string {

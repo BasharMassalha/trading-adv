@@ -84,6 +84,10 @@ model UserInvestmentProfile {
   /// Free-form notes about the investor's situation or constraints
   notes String?
 
+  /// The investor's own description of goals, preferences, and strategy.
+  /// Weighted heavily by the AI analysis so advice matches intent, not just enums.
+  strategyMessage String?
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

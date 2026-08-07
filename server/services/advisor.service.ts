@@ -110,6 +110,13 @@ function buildSystemPrompt(ctx: InternalContext): string {
     if (ctx.profile.notes) {
       parts.push(`- Additional notes: ${ctx.profile.notes}`);
     }
+    if (ctx.profile.strategyMessage) {
+      parts.push(
+        `\n### The investor's own words (goals, preferences, strategy) — weight this heavily`,
+        ctx.profile.strategyMessage,
+        `Treat the message above as the investor's stated intent. When it conflicts with the generic enum settings, ask a clarifying question rather than silently overriding it.`,
+      );
+    }
   } else {
     parts.push(
       `\n## User Profile`,

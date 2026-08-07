@@ -15,6 +15,7 @@ import {
   Clock,
   BarChart3,
   Sparkles,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +55,7 @@ const formSchema = z.object({
   preferredRegions: z.string(),
   preferredSectors: z.string(),
   avoidedSectors: z.string(),
+  strategyMessage: z.string().max(2000).optional(),
   notes: z.string().optional(),
 });
 
@@ -171,6 +173,7 @@ export function InvestorProfileForm({ initialProfile }: Props) {
       preferredRegions: initialProfile?.preferredRegions?.join(", ") ?? "",
       preferredSectors: initialProfile?.preferredSectors?.join(", ") ?? "",
       avoidedSectors: initialProfile?.avoidedSectors?.join(", ") ?? "",
+      strategyMessage: initialProfile?.strategyMessage ?? "",
       notes: initialProfile?.notes ?? "",
     },
   });
@@ -202,6 +205,7 @@ export function InvestorProfileForm({ initialProfile }: Props) {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
+        strategyMessage: data.strategyMessage?.trim() || null,
         notes: data.notes || null,
       };
 
@@ -553,13 +557,50 @@ function ProfileFormFields({
         </CardContent>
       </Card>
 
+      {/* Strategy message — the investor's own words */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <MessageSquare className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle>Your strategy, goals & preferences</CardTitle>
+              <CardDescription>
+                Describe in your own words what you want from this portfolio.
+                The AI weights this above the dropdowns above — including how
+                aggressively you want it to chase returns.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Textarea
+            id="strategyMessage"
+            placeholder="e.g. I want to grow this account meaningfully over 10 years and I'm fine with volatility. Let winners run instead of trimming them just for size. I like founder-led tech and energy, avoid tobacco. Tell me where I can realistically add return, not just where to be safe."
+            className="min-h-[140px] bg-background"
+            maxLength={2000}
+            {...register("strategyMessage")}
+          />
+          <p className="text-xs text-muted-foreground">
+            Mention your return expectations, how much risk you accept, names or
+            themes you like, and anything the advisor should never suggest.
+          </p>
+          {errors.strategyMessage && (
+            <p className="text-xs text-destructive">
+              {errors.strategyMessage.message}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Additional Notes */}
       <Card>
         <CardHeader>
           <CardTitle>Additional Notes</CardTitle>
           <CardDescription>
-            Any other context that might help the AI advisor understand your
-            situation.
+            Constraints or personal context — taxes, income stability, upcoming
+            expenses.
           </CardDescription>
         </CardHeader>
         <CardContent>

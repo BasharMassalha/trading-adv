@@ -19,8 +19,10 @@ import type {
   NewsItem,
   FilingItem,
   EarningsItem,
+  SuperinvestorContext,
 } from "@/lib/analysis/types";
 import { AnalysisProviderError } from "@/lib/analysis/types";
+import { getSuperinvestorConsensusContext } from "@/lib/superinvestors/analysis-context";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
 import { investmentProfileRepository } from "@/server/repositories/investment-profile.repository";
 import { aiReportRepository } from "@/server/repositories/ai-report.repository";
@@ -107,6 +109,7 @@ export type InvestorProfileView = {
   preferredSectors: string[];
   avoidedSectors: string[];
   notes: string | null;
+  strategyMessage: string | null;
   updatedAt: Date;
 };
 
@@ -223,6 +226,7 @@ function toProfileView(profile: UserInvestmentProfile): InvestorProfileView {
     preferredSectors: profile.preferredSectors,
     avoidedSectors: profile.avoidedSectors,
     notes: profile.notes,
+    strategyMessage: profile.strategyMessage,
     updatedAt: profile.updatedAt,
   };
 }
@@ -291,6 +295,7 @@ function dbProfileToContext(
     preferredSectors: profile.preferredSectors,
     avoidedSectors: profile.avoidedSectors,
     notes: profile.notes,
+    strategyMessage: profile.strategyMessage,
   };
 }
 
@@ -319,6 +324,7 @@ export const analysisService = {
       preferredSectors?: string[];
       avoidedSectors?: string[];
       notes?: string | null;
+      strategyMessage?: string | null;
     },
   ): Promise<InvestorProfileView> {
     const profile = await investmentProfileRepository.upsert(userId, {
@@ -330,6 +336,7 @@ export const analysisService = {
       preferredSectors: data.preferredSectors,
       avoidedSectors: data.avoidedSectors,
       notes: data.notes,
+      strategyMessage: data.strategyMessage,
     });
     return toProfileView(profile);
   },
@@ -377,8 +384,14 @@ export const analysisService = {
     const { reportId, userId, portfolioId } = params;
 
     try {
-      const [portfolioView, investorProfile, newsContext, filingsContext, earningsContext] =
-        await Promise.all([
+      const [
+        portfolioView,
+        investorProfile,
+        newsContext,
+        filingsContext,
+        earningsContext,
+        consensusContext,
+      ] = await Promise.all([
           enrichmentService.getPortfolioView(portfolioId),
           investmentProfileRepository.findByUserId(userId),
           newsService.getNewsForPortfolio(portfolioId, {
@@ -393,6 +406,7 @@ export const analysisService = {
             daysBack: 90,
           }),
           earningsService.getEarningsForPortfolio(portfolioId, { maxTickers: 14 }),
+          getSuperinvestorConsensusContext(),
         ]);
 
       // Build input context with source warnings for data quality
@@ -484,8 +498,39 @@ export const analysisService = {
         }
       }
 
+      // Superinvestor consensus — flag which crowded names the user already owns
+      const heldSymbols = new Set(
+        portfolioContext.holdings.map((h) => h.symbol.trim().toUpperCase()),
+      );
+      const superinvestorContext: SuperinvestorContext | undefined =
+        consensusContext
+          ? {
+              asOfLabel: consensusContext.asOfLabel,
+              liveFilerCount: consensusContext.liveFilerCount,
+              minHolders: consensusContext.minHolders,
+              longs: consensusContext.longs.map((c) => ({
+                ...c,
+                heldByUser: heldSymbols.has(c.ticker.toUpperCase()),
+              })),
+              shorts: consensusContext.shorts.map((c) => ({
+                ...c,
+                heldByUser: heldSymbols.has(c.ticker.toUpperCase()),
+              })),
+            }
+          : undefined;
+
+      if (!superinvestorContext) {
+        sourceWarnings.push(
+          "Superinvestor 13F consensus was unavailable for this run; crowd-positioning was not factored in.",
+        );
+      }
+
       console.info(
-        `[analysis] Context: ${portfolioContext.holdingCount} holdings, ${newsItems.length} news, ${filingItems.length} filings, ${earningsItems.length} earnings`,
+        `[analysis] Context: ${portfolioContext.holdingCount} holdings, ${newsItems.length} news, ${filingItems.length} filings, ${earningsItems.length} earnings, ${
+          superinvestorContext
+            ? `${superinvestorContext.longs.length} consensus longs`
+            : "no superinvestor consensus"
+        }`,
       );
 
       const input: AnalysisInput = {
@@ -496,6 +541,7 @@ export const analysisService = {
         newsContext: newsItems.length > 0 ? newsItems : undefined,
         filingsContext: filingItems.length > 0 ? filingItems : undefined,
         earningsContext: earningsItems.length > 0 ? earningsItems : undefined,
+        superinvestorContext,
         sourceWarnings: sourceWarnings.length > 0 ? sourceWarnings : undefined,
       };
 

@@ -9,3 +9,8 @@ export {
   loadSuperinvestorById,
   SUPERINVESTORS_DISCLAIMER,
 } from "./live";
+export {
+  getSuperinvestorConsensusContext,
+  type ConsensusSignal,
+  type SuperinvestorConsensusContext,
+} from "./analysis-context";

@@ -15,6 +15,7 @@ import {
   Upload,
   Sparkles,
   TrendingUp,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +42,7 @@ type ProfileData = {
   assetPreference: string;
   preferredSectors: string[];
   avoidedSectors: string[];
+  strategyMessage: string;
 };
 
 const STEPS = [
@@ -48,6 +51,7 @@ const STEPS = [
   { id: "goal", title: "Investment Goal", icon: Target },
   { id: "asset", title: "Asset Preference", icon: BarChart3 },
   { id: "sectors", title: "Sectors", icon: Briefcase },
+  { id: "message", title: "Your Strategy", icon: MessageSquare },
   { id: "complete", title: "Complete", icon: Upload },
 ] as const;
 
@@ -159,6 +163,7 @@ export function OnboardingWizard() {
     assetPreference: "",
     preferredSectors: [],
     avoidedSectors: [],
+    strategyMessage: "",
   });
 
   const progress = ((currentStep + 1) / STEPS.length) * 100;
@@ -172,7 +177,8 @@ export function OnboardingWizard() {
       case 2: return !!data.investmentGoal;
       case 3: return !!data.assetPreference;
       case 4: return true; // Sectors are optional
-      case 5: return true; // Complete step
+      case 5: return true; // Strategy message is optional
+      case 6: return true; // Complete step
       default: return false;
     }
   }
@@ -201,6 +207,7 @@ export function OnboardingWizard() {
         avoidedSectors: profileData.avoidedSectors,
         preferredRegions: [],
         notes: null,
+        strategyMessage: profileData.strategyMessage.trim() || null,
       };
 
       const res = await fetch("/api/investor-profile", {
@@ -310,6 +317,14 @@ export function OnboardingWizard() {
           />
         )}
         {currentStep === 5 && (
+          <StrategyMessageStep
+            value={profileData.strategyMessage}
+            onChange={(v) =>
+              setProfileData({ ...profileData, strategyMessage: v })
+            }
+          />
+        )}
+        {currentStep === 6 && (
           <CompleteStep profileData={profileData} />
         )}
       </div>
@@ -327,7 +342,7 @@ export function OnboardingWizard() {
         </Button>
 
         <div className="flex gap-2">
-          {currentStep === 4 && (
+          {(currentStep === 4 || currentStep === 5) && (
             <Button variant="ghost" onClick={handleNext}>
               Skip
             </Button>
@@ -717,6 +732,68 @@ function SectorsStep({
   );
 }
 
+const STRATEGY_PROMPTS = [
+  "I want to grow this account aggressively over 10+ years and I'm fine with drawdowns along the way.",
+  "Let my winners run — don't tell me to trim a position just because it got big.",
+  "I like founder-led tech and energy names; never suggest tobacco or gambling.",
+  "Show me where I can realistically add return, not only where to be safe.",
+];
+
+function StrategyMessageStep({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Card className="border-0 shadow-none">
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <MessageSquare className="h-8 w-8 text-primary" />
+        </div>
+        <CardTitle className="text-2xl">
+          Tell us your goals and strategy
+        </CardTitle>
+        <CardDescription className="text-base">
+          Optional, but this is the single most useful thing you can give the
+          AI. It weights your own words above the choices you just made.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={2000}
+          placeholder="e.g. I'm building long-term wealth and can stomach big swings. I want ideas that meaningfully beat the index, not just safe diversification. I follow AI infrastructure and energy closely, and I never want exposure to tobacco."
+          className="min-h-[180px] text-base"
+        />
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Return expectations, risk appetite, themes you like or refuse.</span>
+          <span>{value.length}/2000</span>
+        </div>
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <p className="mb-2 text-sm font-medium">Need a starting point?</p>
+          <div className="flex flex-wrap gap-2">
+            {STRATEGY_PROMPTS.map((prompt) => (
+              <Badge
+                key={prompt}
+                variant="outline"
+                className="cursor-pointer px-3 py-1.5 text-left text-xs font-normal transition-colors hover:bg-primary/10"
+                onClick={() =>
+                  onChange(value.trim() ? `${value.trim()} ${prompt}` : prompt)
+                }
+              >
+                + {prompt}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompleteStep({ profileData }: { profileData: ProfileData }) {
   return (
     <Card className="border-0 shadow-none">
@@ -756,6 +833,15 @@ function CompleteStep({ profileData }: { profileData: ProfileData }) {
                   </span>
                 </div>
               )}
+            </div>
+          )}
+
+          {profileData.strategyMessage.trim().length > 0 && (
+            <div className="mt-4 border-t pt-4">
+              <div className="text-sm font-medium">Your strategy</div>
+              <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">
+                {profileData.strategyMessage.trim()}
+              </p>
             </div>
           )}
         </div>

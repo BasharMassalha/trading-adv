@@ -13,6 +13,7 @@ export const investorProfileSchema = z.object({
   preferredSectors: z.array(z.string().trim().max(50)).max(20).optional(),
   avoidedSectors: z.array(z.string().trim().max(50)).max(20).optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
+  strategyMessage: z.string().trim().max(2000).nullable().optional(),
 });
 
 export type InvestorProfileInput = z.infer<typeof investorProfileSchema>;

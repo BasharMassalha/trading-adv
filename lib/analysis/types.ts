@@ -37,6 +37,8 @@ export type InvestorProfileContext = {
   preferredSectors: string[];
   avoidedSectors: string[];
   notes: string | null;
+  /** The investor's own words about goals, preferences, and strategy. */
+  strategyMessage: string | null;
 };
 
 export type HoldingContext = {
@@ -113,6 +115,36 @@ export type EarningsItem = {
 };
 
 /**
+ * A stock several tracked superinvestors hold on the same side, derived from
+ * their latest SEC Form 13F filings.
+ */
+export type SuperinvestorConsensusItem = {
+  ticker: string;
+  name: string;
+  side: "long" | "short";
+  /** How many tracked superinvestors report the position. */
+  holderCount: number;
+  /** Investor names, heaviest position first. */
+  holders: string[];
+  /** Average weight of the position across those investors' 13F books. */
+  avgWeightPct: number;
+  /** True when the user's portfolio already holds this ticker. */
+  heldByUser: boolean;
+};
+
+/** Crowd-positioning signal from tracked superinvestors' 13F filings. */
+export type SuperinvestorContext = {
+  /** Quarter label, e.g. "Q1 2026". */
+  asOfLabel: string;
+  /** Number of tracked filers with a successfully parsed 13F. */
+  liveFilerCount: number;
+  /** Minimum holders required for a name to count as consensus. */
+  minHolders: number;
+  longs: SuperinvestorConsensusItem[];
+  shorts: SuperinvestorConsensusItem[];
+};
+
+/**
  * SEC filing or earnings context for fundamental analysis.
  * This field is optional and designed for future filings retrieval integration.
  */
@@ -154,6 +186,9 @@ export type AnalysisInput = {
 
   /** Most recent earnings results + upcoming earnings dates per ticker */
   earningsContext?: EarningsItem[];
+
+  /** Positions multiple tracked superinvestors share, from their 13F filings */
+  superinvestorContext?: SuperinvestorContext;
 
   /** Warnings about data retrieval or quality issues */
   sourceWarnings?: string[];
