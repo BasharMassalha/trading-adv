@@ -6,6 +6,7 @@ import {
   Settings,
   LineChart,
   ShieldAlert,
+  Users,
 } from "lucide-react";
 
 export type NavItem = {
@@ -19,6 +20,7 @@ export const NAV: NavItem[] = [
   { label: "Portfolios", href: "/portfolio", icon: Briefcase },
   { label: "Upload", href: "/portfolio/upload", icon: Upload },
   { label: "AI Advisor", href: "/advisor", icon: Sparkles },
+  { label: "Superinvestors", href: "/superinvestors", icon: Users },
   { label: "Markets", href: "/markets", icon: LineChart },
   { label: "Market Risk", href: "/market-risk", icon: ShieldAlert },
   { label: "Settings", href: "/settings", icon: Settings },
