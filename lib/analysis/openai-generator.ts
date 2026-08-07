@@ -62,6 +62,96 @@ function stripNulls(value: unknown): unknown {
   return value;
 }
 
+/** Prefer cutting at a sentence/word boundary so truncated text still reads cleanly. */
+function softTruncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const slice = text.slice(0, max);
+  const sentence = Math.max(
+    slice.lastIndexOf(". "),
+    slice.lastIndexOf("! "),
+    slice.lastIndexOf("? "),
+  );
+  if (sentence >= Math.floor(max * 0.6)) {
+    return slice.slice(0, sentence + 1).trimEnd();
+  }
+  const space = slice.lastIndexOf(" ");
+  if (space >= Math.floor(max * 0.6)) {
+    return `${slice.slice(0, space).trimEnd()}…`;
+  }
+  return `${slice.trimEnd()}…`;
+}
+
+function clampString(value: unknown, max: number): unknown {
+  return typeof value === "string" ? softTruncate(value, max) : value;
+}
+
+function clampStringArray(value: unknown, max: number): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((item) => clampString(item, max));
+}
+
+/**
+ * Models routinely overrun Zod string maxima once the prompt asks for news,
+ * consensus, and strategy detail. Clamp known text fields before validation so
+ * a slightly long bullet never fails the whole report.
+ */
+function clampReportStrings(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const report = { ...(value as Record<string, unknown>) };
+
+  report.summary = clampString(report.summary, 2000);
+  report.strengths = clampStringArray(report.strengths, 500);
+  report.risks = clampStringArray(report.risks, 500);
+  report.opportunities = clampStringArray(report.opportunities, 500);
+  report.suggestedActions = clampStringArray(report.suggestedActions, 500);
+  report.followUpQuestions = clampStringArray(report.followUpQuestions, 300);
+
+  const actionPlan = report.actionPlan;
+  if (actionPlan && typeof actionPlan === "object" && !Array.isArray(actionPlan)) {
+    const plan = { ...(actionPlan as Record<string, unknown>) };
+
+    if (Array.isArray(plan.holdingsToReview)) {
+      plan.holdingsToReview = plan.holdingsToReview.map((row) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+        const h = { ...(row as Record<string, unknown>) };
+        h.reason = clampString(h.reason, 400);
+        h.thesis = clampString(h.thesis, 600);
+        h.bullCase = clampStringArray(h.bullCase, 260);
+        h.bearCase = clampStringArray(h.bearCase, 260);
+        h.catalysts = clampStringArray(h.catalysts, 220);
+        h.recentDevelopments = clampStringArray(h.recentDevelopments, 280);
+        h.risks = clampStringArray(h.risks, 260);
+        h.todoItems = clampStringArray(h.todoItems, 220);
+
+        const earnings = h.earningsHighlight;
+        if (earnings && typeof earnings === "object" && !Array.isArray(earnings)) {
+          const e = { ...(earnings as Record<string, unknown>) };
+          e.lastReportPeriod = clampString(e.lastReportPeriod, 20);
+          e.story = clampString(e.story, 500);
+          e.nextWatchPoints = clampStringArray(e.nextWatchPoints, 180);
+          h.earningsHighlight = e;
+        }
+        return h;
+      });
+    }
+
+    if (Array.isArray(plan.potentialAdditions)) {
+      plan.potentialAdditions = plan.potentialAdditions.map((row) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+        const a = { ...(row as Record<string, unknown>) };
+        a.suggestion = clampString(a.suggestion, 200);
+        a.rationale = clampString(a.rationale, 500);
+        return a;
+      });
+    }
+
+    plan.rebalancingSteps = clampStringArray(plan.rebalancingSteps, 300);
+    report.actionPlan = plan;
+  }
+
+  return report;
+}
+
 const analysisReportSchema = z.object({
   // GPT-5 tends to write longer summaries once news + consensus + strategy
   // are required; 2000 is the hard ceiling, the prompt asks for ~1200.
@@ -815,14 +905,24 @@ Keep thesis to at most 2 sentences and bullCase/bearCase/catalysts to 2 bullets 
     // fields they leave empty, which Zod's `.optional()` rejects. Strip nulls so
     // those fields are treated as omitted.
     parsed = stripNulls(parsed);
+    // Soft-truncate known text fields that routinely overrun Zod maxima.
+    parsed = clampReportStrings(parsed);
 
     const result = analysisReportSchema.safeParse(parsed);
     if (!result.success) {
-      console.error("[analysis:openai] Validation failed:", result.error.flatten());
+      const flat = result.error.flatten();
+      console.error("[analysis:openai] Validation failed:", flat);
+      const fieldHints = Object.entries(flat.fieldErrors)
+        .flatMap(([field, msgs]) =>
+          (msgs ?? []).map((m) => `${field}: ${m}`),
+        )
+        .slice(0, 4);
       throw new AnalysisProviderError(
-        "Model response did not match expected schema",
+        fieldHints.length > 0
+          ? `Model response did not match expected schema (${fieldHints.join("; ")})`
+          : "Model response did not match expected schema",
         "VALIDATION_ERROR",
-        { errors: result.error.flatten(), raw: parsed },
+        { errors: flat, raw: parsed },
       );
     }
 
