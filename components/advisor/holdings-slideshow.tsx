@@ -17,7 +17,6 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type {
   HoldingRecommendation,
@@ -32,44 +31,48 @@ type Props = {
   onTickerPulse?: (ticker: string) => void;
 };
 
+/**
+ * Verdict keys map to semantic tokens: `glow` tints the ticker tile, `ring`
+ * sets its text colour, `chip` styles the verdict badge.
+ */
 function verdictPalette(v: HoldingVerdict | undefined) {
   switch (v) {
     case "BUY":
     case "ACCUMULATE":
       return {
-        ring: "ring-emerald-500/40",
-        chip: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+        ring: "text-success",
+        chip: "border-transparent bg-success-soft text-success",
         arrow: TrendingUp,
-        glow: "from-emerald-500/15 via-emerald-500/0 to-emerald-500/0",
+        glow: "bg-success-soft",
       };
     case "TRIM":
       return {
-        ring: "ring-amber-500/40",
-        chip: "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
+        ring: "text-warning",
+        chip: "border-transparent bg-warning-soft text-warning",
         arrow: TrendingDown,
-        glow: "from-amber-500/15 via-amber-500/0 to-amber-500/0",
+        glow: "bg-warning-soft",
       };
     case "SELL":
       return {
-        ring: "ring-rose-500/40",
-        chip: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+        ring: "text-destructive",
+        chip: "border-transparent bg-destructive-soft text-destructive",
         arrow: TrendingDown,
-        glow: "from-rose-500/15 via-rose-500/0 to-rose-500/0",
+        glow: "bg-destructive-soft",
       };
     case "WATCH":
       return {
-        ring: "ring-sky-500/40",
-        chip: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
+        ring: "text-primary",
+        chip: "border-transparent bg-primary-soft text-primary",
         arrow: Gauge,
-        glow: "from-sky-500/15 via-sky-500/0 to-sky-500/0",
+        glow: "bg-primary-soft",
       };
     case "HOLD":
     default:
       return {
-        ring: "ring-primary/30",
-        chip: "bg-primary/10 text-primary border-primary/30",
+        ring: "text-muted-foreground",
+        chip: "border-border bg-background text-muted-foreground",
         arrow: Gauge,
-        glow: "from-primary/10 via-primary/0 to-primary/0",
+        glow: "bg-muted",
       };
   }
 }
@@ -121,13 +124,13 @@ export function HoldingsSlideshow({
   if (valid.length === 0) {
     return (
       <Overlay onClose={onClose}>
-        <div className="rounded-2xl border bg-card p-8 text-center shadow-2xl">
-          <Sparkles className="mx-auto mb-3 h-8 w-8 text-primary" />
-          <p className="font-semibold">No per-stock analysis yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Generate (or regenerate) an analysis to unlock the walkthrough.
+        <div className="border bg-surface p-8 text-center shadow-pop">
+          <Sparkles className="mx-auto mb-3 h-5 w-5 stroke-[1.6] text-faint" />
+          <p className="text-[14px] font-semibold">No per-stock analysis yet</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            Generate or regenerate an analysis to unlock the walkthrough.
           </p>
-          <Button onClick={onClose} className="mt-5">
+          <Button onClick={onClose} variant="outline" className="mt-5">
             Close
           </Button>
         </div>
@@ -141,60 +144,54 @@ export function HoldingsSlideshow({
 
   return (
     <Overlay onClose={onClose}>
-      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <div className="flex w-full max-w-4xl flex-col overflow-hidden border bg-surface shadow-pop">
         {/* Top bar */}
-        <div className="flex items-center justify-between gap-2 border-b px-5 py-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
+        <div className="flex items-center justify-between gap-2 border-b px-5 py-2.5">
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+            <Sparkles className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
             <span>Per-stock walkthrough</span>
-            <span className="mx-2">·</span>
-            <span>
+            <span className="text-faint">·</span>
+            <span className="font-mono">
               {idx + 1} / {valid.length}
             </span>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 stroke-[1.6]" />
           </Button>
         </div>
 
         {/* Slide body */}
-        <div
-          className={cn(
-            "relative grid max-h-[78vh] overflow-y-auto bg-gradient-to-br p-6 sm:p-8",
-            palette.glow,
-          )}
-        >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-from),_transparent_60%)] opacity-60" />
-
-          <div className="relative space-y-6">
+        <div className="relative grid max-h-[78vh] overflow-y-auto bg-surface p-6 sm:p-8">
+          <div className="relative space-y-5">
             {/* Hero */}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
-                      "flex h-12 w-12 items-center justify-center rounded-xl border bg-background/70 ring-2 font-mono text-base font-bold tracking-tight backdrop-blur",
+                      "flex h-12 w-12 shrink-0 items-center justify-center border font-mono text-[15px] font-semibold tracking-tight",
+                      palette.glow,
                       palette.ring,
                     )}
                   >
                     {h.ticker}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+                          "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
                           palette.chip,
                         )}
                       >
-                        <Arrow className="h-3.5 w-3.5" />
+                        <Arrow className="h-3.5 w-3.5 stroke-[1.6]" />
                         {h.verdict ?? "HOLD"}
                       </span>
-                      <span className="text-[11px] font-medium text-muted-foreground">
+                      <span className="text-[11px] text-faint">
                         {convictionLabel(h.conviction)}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-foreground/80">
+                    <p className="mt-1 text-[13px] text-muted-foreground">
                       {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
                     </p>
                   </div>
@@ -207,7 +204,7 @@ export function HoldingsSlideshow({
                   onClick={() => onTickerPulse(h.ticker)}
                   className="gap-1.5"
                 >
-                  <Flame className="h-3.5 w-3.5" />
+                  <Flame className="h-3.5 w-3.5 stroke-[1.6]" />
                   Latest pulse
                 </Button>
               )}
@@ -215,15 +212,15 @@ export function HoldingsSlideshow({
 
             {/* Thesis */}
             {h.thesis && (
-              <div className="rounded-xl border bg-background/60 p-4 backdrop-blur">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Our thesis right now
+              <div className="border bg-background p-4">
+                <div className="text-[11px] uppercase tracking-wide text-faint">
+                  Current thesis
                 </div>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">
+                <p className="mt-1.5 text-[13px] leading-relaxed">
                   {h.thesis}
                 </p>
                 {h.reason && h.thesis !== h.reason && (
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
                     {h.reason}
                   </p>
                 )}
@@ -234,7 +231,7 @@ export function HoldingsSlideshow({
             <EarningsCard data={h.earningsHighlight} ticker={h.ticker} />
 
             {/* Bull / Bear case */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <CaseCard
                 tone="bull"
                 title="Bull case"
@@ -250,13 +247,13 @@ export function HoldingsSlideshow({
             </div>
 
             {/* Recent developments and catalysts */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <DetailList
                 icon={Lightbulb}
-                title="What we found (filings & news)"
-                hint="The AI did this work — you don't have to read filings yourself."
+                title="From filings and news"
+                hint="Sourced automatically for this name."
                 items={h.recentDevelopments}
-                emptyText="No filings/news ingested for this ticker — verdict from portfolio metrics only."
+                emptyText="No filings or news ingested for this ticker. Verdict from portfolio metrics only."
               />
               <DetailList
                 icon={Target}
@@ -268,7 +265,7 @@ export function HoldingsSlideshow({
             </div>
 
             {/* Risks + execution */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <DetailList
                 icon={ShieldAlert}
                 title="Risks specific to this name"
@@ -277,23 +274,23 @@ export function HoldingsSlideshow({
               />
               <DetailList
                 icon={Gauge}
-                title="Your execution checklist"
-                hint="Concrete steps you own (alerts, sizing rules)."
+                title="Execution checklist"
+                hint="Steps you own: alerts, sizing rules."
                 items={h.todoItems}
                 emptyText="Nothing to execute right now beyond the verdict above."
               />
             </div>
 
             {/* Disclaimer */}
-            <p className="text-center text-[11px] text-muted-foreground">
-              Informational only — not personal financial advice. Verify against
+            <p className="text-center text-[11px] text-faint">
+              Informational only, not personal financial advice. Verify against
               your plan, taxes, and risk tolerance before any trade.
             </p>
           </div>
         </div>
 
         {/* Footer nav */}
-        <div className="flex items-center justify-between border-t px-5 py-3">
+        <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
           <Button
             variant="outline"
             size="sm"
@@ -301,7 +298,7 @@ export function HoldingsSlideshow({
             disabled={valid.length <= 1}
             className="gap-1.5"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 stroke-[1.6]" />
             Prev
           </Button>
 
@@ -312,8 +309,8 @@ export function HoldingsSlideshow({
                 aria-label={`Go to ${slide.ticker}`}
                 onClick={() => setIdx(i)}
                 className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  i === idx ? "w-6 bg-primary" : "w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60",
+                  "h-1 transition-all",
+                  i === idx ? "w-6 bg-primary" : "w-2 bg-border-strong hover:bg-faint",
                 )}
               />
             ))}
@@ -326,7 +323,7 @@ export function HoldingsSlideshow({
             className="gap-1.5"
           >
             Next
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 stroke-[1.6]" />
           </Button>
         </div>
       </div>
@@ -343,7 +340,7 @@ function Overlay({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-background/80 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >
@@ -373,33 +370,37 @@ function formatDateShort(iso: string | undefined): string | null {
   }
 }
 
+/**
+ * Surprise keys map to semantic tokens: `bg` styles the result badge, `accent`
+ * sets the card's border colour.
+ */
 function surprisePalette(label: string | undefined) {
   switch (label) {
     case "BEAT":
       return {
-        bg: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-        accent: "from-emerald-500/20 via-emerald-500/0 to-emerald-500/0",
+        bg: "border-transparent bg-success-soft text-success",
+        accent: "border-success/40",
         icon: TrendingUp,
         word: "Beat",
       };
     case "MISSED":
       return {
-        bg: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
-        accent: "from-rose-500/20 via-rose-500/0 to-rose-500/0",
+        bg: "border-transparent bg-destructive-soft text-destructive",
+        accent: "border-destructive/40",
         icon: TrendingDown,
         word: "Missed",
       };
     case "MET":
       return {
-        bg: "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
-        accent: "from-amber-500/20 via-amber-500/0 to-amber-500/0",
+        bg: "border-transparent bg-warning-soft text-warning",
+        accent: "border-warning/40",
         icon: Gauge,
         word: "Met",
       };
     default:
       return {
-        bg: "bg-muted text-muted-foreground border-border",
-        accent: "from-primary/10 via-primary/0 to-primary/0",
+        bg: "border-border bg-muted text-muted-foreground",
+        accent: "border-border",
         icon: Mic,
         word: "Awaiting print",
       };
@@ -428,81 +429,67 @@ function EarningsCard({
   const nextDate = formatDateShort(data.nextReportDate);
 
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-xl border bg-background/60 p-4 backdrop-blur",
+    <div className={cn("border bg-background p-4", palette.accent)}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Mic className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+        <div className="text-[11px] uppercase tracking-wide text-faint">
+          Latest earnings call: {ticker}
+        </div>
+        <span
+          className={cn(
+            "ml-auto inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+            palette.bg,
+          )}
+        >
+          <Icon className="h-3 w-3 stroke-[1.6]" />
+          {palette.word}
+          {data.surprisePct != null && data.surpriseLabel !== "UNKNOWN" && (
+            <span className="font-mono">
+              {" "}
+              {data.surprisePct >= 0 ? "+" : ""}
+              {data.surprisePct.toFixed(1)}%
+            </span>
+          )}
+        </span>
+      </div>
+
+      {(data.lastReportPeriod || lastDate) && (
+        <p className="font-mono text-[11px] text-faint">
+          {data.lastReportPeriod ?? "Most recent"}
+          {lastDate ? ` · reported ${lastDate}` : ""}
+        </p>
       )}
-    >
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-70",
-          palette.accent,
-        )}
-      />
-      <div className="relative">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Mic className="h-3.5 w-3.5 text-primary" />
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Latest earnings call — {ticker}
-          </div>
-          <span
-            className={cn(
-              "ml-auto inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-              palette.bg,
-            )}
-          >
-            <Icon className="h-3 w-3" />
-            {palette.word}
-            {data.surprisePct != null && data.surpriseLabel !== "UNKNOWN" && (
-              <span className="font-mono">
-                {" "}
-                {data.surprisePct >= 0 ? "+" : ""}
-                {data.surprisePct.toFixed(1)}%
+
+      {data.story && (
+        <p className="mt-2 text-[13px] leading-relaxed">{data.story}</p>
+      )}
+
+      {(nextDate ||
+        (data.nextWatchPoints && data.nextWatchPoints.length > 0)) && (
+        <div className="mt-3 flex flex-wrap items-start gap-3 border bg-surface p-3">
+          <div className="flex items-center gap-1.5 text-[12px] font-medium">
+            <CalendarClock className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+            <span>Next call</span>
+            {nextDate && (
+              <span className="ml-1 rounded-md border bg-background px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+                {nextDate}
               </span>
             )}
-          </span>
-        </div>
-
-        {(data.lastReportPeriod || lastDate) && (
-          <p className="text-[11px] text-muted-foreground">
-            {data.lastReportPeriod ?? "Most recent"}
-            {lastDate ? ` · reported ${lastDate}` : ""}
-          </p>
-        )}
-
-        {data.story && (
-          <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-            {data.story}
-          </p>
-        )}
-
-        {(nextDate ||
-          (data.nextWatchPoints && data.nextWatchPoints.length > 0)) && (
-          <div className="mt-3 flex flex-wrap items-start gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold">
-              <CalendarClock className="h-3.5 w-3.5 text-primary" />
-              <span>Next call</span>
-              {nextDate && (
-                <span className="ml-1 rounded-md bg-background px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground">
-                  {nextDate}
-                </span>
-              )}
-            </div>
-            {data.nextWatchPoints && data.nextWatchPoints.length > 0 && (
-              <ul className="flex flex-wrap gap-1.5">
-                {data.nextWatchPoints.map((p, i) => (
-                  <li
-                    key={i}
-                    className="rounded-full border bg-background/70 px-2 py-0.5 text-[11px] text-foreground/80"
-                  >
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
-        )}
-      </div>
+          {data.nextWatchPoints && data.nextWatchPoints.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {data.nextWatchPoints.map((p, i) => (
+                <li
+                  key={i}
+                  className="rounded-md border bg-background px-2 py-0.5 text-[11px] text-muted-foreground"
+                >
+                  {p}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -522,26 +509,26 @@ function CaseCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-background/60 p-4 backdrop-blur",
-        isBull ? "border-emerald-500/25" : "border-rose-500/25",
+        "border bg-background p-4",
+        isBull ? "border-success/30" : "border-destructive/30",
       )}
     >
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
+      <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-semibold">
         {isBull ? (
-          <TrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          <TrendingUp className="h-4 w-4 shrink-0 stroke-[1.6] text-success" />
         ) : (
-          <TrendingDown className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+          <TrendingDown className="h-4 w-4 shrink-0 stroke-[1.6] text-destructive" />
         )}
         <span>{title}</span>
       </div>
       {items && items.length > 0 ? (
-        <ul className="space-y-1.5 text-sm leading-snug">
+        <ul className="space-y-2 text-[12.5px] leading-relaxed">
           {items.map((it, i) => (
-            <li key={i} className="flex gap-2 text-foreground/85">
+            <li key={i} className="flex gap-2.5">
               <span
                 className={cn(
-                  "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                  isBull ? "bg-emerald-500" : "bg-rose-500",
+                  "mt-[7px] h-1 w-1 shrink-0",
+                  isBull ? "bg-success" : "bg-destructive",
                 )}
               />
               <span>{it}</span>
@@ -549,7 +536,7 @@ function CaseCard({
           ))}
         </ul>
       ) : (
-        <p className="text-xs italic text-muted-foreground">{fallback}</p>
+        <p className="text-[12px] text-faint">{fallback}</p>
       )}
     </div>
   );
@@ -569,28 +556,28 @@ function DetailList({
   emptyText: string;
 }) {
   return (
-    <div className="rounded-xl border bg-background/60 p-4 backdrop-blur">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
-        <Icon className="h-3.5 w-3.5 text-primary" />
+    <div className="border bg-background p-4">
+      <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold">
+        <Icon className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
         <span>{title}</span>
       </div>
-      {hint && <p className="-mt-1 mb-2 text-[11px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="-mt-1 mb-2.5 text-[11px] text-faint">{hint}</p>}
       {items && items.length > 0 ? (
-        <ul className="space-y-1.5 text-sm leading-snug">
+        <ul className="border">
           {items.map((it, i) => (
             <li
               key={i}
-              className="flex gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-foreground/85"
+              className="flex gap-2.5 border-b bg-surface px-2.5 py-2 text-[12.5px] leading-relaxed last:border-b-0"
             >
-              <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+              <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
                 {i + 1}
-              </Badge>
+              </span>
               <span>{it}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-xs italic text-muted-foreground">{emptyText}</p>
+        <p className="text-[12px] text-faint">{emptyText}</p>
       )}
     </div>
   );

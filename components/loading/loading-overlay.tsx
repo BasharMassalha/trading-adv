@@ -21,22 +21,22 @@ export function LoadingOverlay({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndexClass} flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200`}
+      className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-background/80 animate-in fade-in duration-200`}
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
-      <div className="h-16 w-16">
+      <div className="flex items-center gap-3 border bg-surface px-5 py-4">
         {/* eslint-disable-next-line @next/next/no-img-element -- local animated SVG asset */}
         <img
           src="/terminal-loader.svg"
           alt=""
-          width={64}
-          height={64}
-          className="h-16 w-16"
+          width={32}
+          height={32}
+          className="h-8 w-8 shrink-0"
         />
+        <p className="text-[13px] text-muted-foreground">{message}</p>
       </div>
-      <p className="text-sm font-medium text-muted-foreground">{message}</p>
     </div>
   );
 }

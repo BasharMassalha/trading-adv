@@ -1,103 +1,93 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Target,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default function SettingsPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your account and preferences.
+    <div className="mx-auto max-w-2xl space-y-5">
+      <PageHeader
+        title="Settings"
+        description="Manage your account and the mandate your analysis is measured against."
+      />
+
+      <div className="border bg-surface p-5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight">
+          Investor profile
+        </h2>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+          Risk tolerance, horizon, goals and sector constraints. Every AI
+          analysis is scored against this profile.
         </p>
+        <Button variant="outline" size="sm" className="mt-4" asChild>
+          <Link href="/settings/investor-profile">
+            Manage investor profile
+            <ArrowRight className="h-4 w-4 stroke-[1.6] text-faint" />
+          </Link>
+        </Button>
       </div>
 
-      <Card className="border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" />
-            Investor Profile
-          </CardTitle>
-          <CardDescription>
-            Set your risk tolerance, investment goals, and preferences to get
-            personalized AI analysis.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/settings/investor-profile">
-            <Button variant="outline" className="gap-2">
-              Manage investor profile
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Update your name and email address.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+      <div className="border bg-surface p-5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight">Profile</h2>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+          Update your name and email address.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="name" className="text-[12.5px]">
+              Name
+            </Label>
             <Input id="name" defaultValue="Alex Morgan" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="email" className="text-[12.5px]">
+              Email
+            </Label>
             <Input id="email" type="email" defaultValue="alex@example.com" />
           </div>
           <Button>Save changes</Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Password</CardTitle>
-          <CardDescription>Change your account password.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="current-password">Current password</Label>
+      <div className="border bg-surface p-5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight">Password</h2>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+          Change your account password.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="current-password" className="text-[12.5px]">
+              Current password
+            </Label>
             <Input id="current-password" type="password" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-password">New password</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-password" className="text-[12.5px]">
+              New password
+            </Label>
             <Input id="new-password" type="password" />
           </div>
           <Button variant="outline">Update password</Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Separator />
-
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="text-destructive">Danger zone</CardTitle>
-          <CardDescription>
-            Permanently delete your account and all associated data.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive">Delete account</Button>
-        </CardContent>
-      </Card>
+      <div className="border border-destructive/30 bg-destructive-soft p-5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight text-destructive">
+          Danger zone
+        </h2>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+          Permanently delete your account and all associated data. This cannot
+          be undone.
+        </p>
+        <Button variant="destructive" size="sm" className="mt-4">
+          Delete account
+        </Button>
+      </div>
     </div>
   );
 }

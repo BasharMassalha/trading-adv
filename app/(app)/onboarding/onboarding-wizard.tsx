@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   ArrowLeft,
-  CheckCircle2,
+  Check,
   Loader2,
   Shield,
   Clock,
@@ -13,19 +13,10 @@ import {
   BarChart3,
   Briefcase,
   Upload,
-  Sparkles,
   TrendingUp,
   MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,13 +37,13 @@ type ProfileData = {
 };
 
 const STEPS = [
-  { id: "risk", title: "Risk Tolerance", icon: Shield },
-  { id: "horizon", title: "Investment Horizon", icon: Clock },
-  { id: "goal", title: "Investment Goal", icon: Target },
-  { id: "asset", title: "Asset Preference", icon: BarChart3 },
+  { id: "risk", title: "Risk", icon: Shield },
+  { id: "horizon", title: "Horizon", icon: Clock },
+  { id: "goal", title: "Goal", icon: Target },
+  { id: "asset", title: "Assets", icon: BarChart3 },
   { id: "sectors", title: "Sectors", icon: Briefcase },
-  { id: "message", title: "Your Strategy", icon: MessageSquare },
-  { id: "complete", title: "Complete", icon: Upload },
+  { id: "message", title: "Strategy", icon: MessageSquare },
+  { id: "complete", title: "Review", icon: Upload },
 ] as const;
 
 const RISK_OPTIONS = [
@@ -61,21 +52,18 @@ const RISK_OPTIONS = [
     label: "Conservative",
     desc: "Prefer stability over growth; willing to accept lower returns for less volatility",
     icon: Shield,
-    color: "text-blue-500",
   },
   {
     value: "MODERATE",
     label: "Moderate",
     desc: "Balanced approach; comfortable with some fluctuations for better returns",
     icon: BarChart3,
-    color: "text-yellow-500",
   },
   {
     value: "AGGRESSIVE",
     label: "Aggressive",
     desc: "Maximize growth; willing to accept significant volatility",
     icon: TrendingUp,
-    color: "text-red-500",
   },
 ];
 
@@ -90,25 +78,21 @@ const GOAL_OPTIONS = [
     value: "GROWTH",
     label: "Growth",
     desc: "Maximize capital appreciation over time",
-    emoji: "📈",
   },
   {
     value: "INCOME",
     label: "Income",
     desc: "Generate regular income (dividends/interest)",
-    emoji: "💰",
   },
   {
     value: "BALANCED",
     label: "Balanced",
     desc: "Mix of growth and income",
-    emoji: "⚖️",
   },
   {
     value: "CAPITAL_PRESERVATION",
     label: "Capital Preservation",
     desc: "Protect principal, beat inflation",
-    emoji: "🛡️",
   },
 ];
 
@@ -147,6 +131,73 @@ const COMMON_SECTORS = [
   "Utilities",
   "Communication Services",
 ];
+
+// ---------------------------------------------------------------------------
+// Shared presentation helpers
+// ---------------------------------------------------------------------------
+
+/** Flat hairline panel wrapping one wizard step. */
+function StepPanel({
+  title,
+  description,
+  hint,
+  children,
+}: {
+  title: string;
+  description: string;
+  hint?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border bg-surface p-5">
+      <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+      <p className="mt-1 max-w-[60ch] text-[12.5px] leading-relaxed text-muted-foreground">
+        {description}
+      </p>
+      {hint ? (
+        <p className="mt-1.5 text-[11px] uppercase tracking-wide text-faint">
+          {hint}
+        </p>
+      ) : null}
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+const OPTION_BASE =
+  "border bg-surface p-4 text-left transition-colors hover:bg-background";
+const OPTION_SELECTED = "border-primary bg-primary-soft hover:bg-primary-soft";
+
+/** Toggle chip used for sector and prompt selection. */
+function Chip({
+  children,
+  selected,
+  tone = "primary",
+  onClick,
+}: {
+  children: React.ReactNode;
+  selected?: boolean;
+  tone?: "primary" | "destructive";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        "max-w-full rounded-md border px-2.5 py-1 text-left text-[12px] transition-colors",
+        selected
+          ? tone === "destructive"
+            ? "border-destructive/40 bg-destructive-soft text-destructive"
+            : "border-primary bg-primary-soft text-primary"
+          : "bg-surface text-muted-foreground hover:bg-background",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -230,52 +281,44 @@ export function OnboardingWizard() {
     }
   }
 
-  function handleSkipToUpload() {
-    router.push("/portfolio/upload?onboarding=true");
-  }
-
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="mx-auto max-w-2xl space-y-4">
       {/* Progress Header */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Step {currentStep + 1} of {STEPS.length}</span>
-          <span>{Math.round(progress)}% complete</span>
+      <div className="border bg-surface p-5">
+        <div className="flex items-baseline justify-between">
+          <span className="font-mono text-[11px] text-faint">
+            Step {currentStep + 1} of {STEPS.length}
+          </span>
+          <span className="font-mono text-[11px] text-faint">
+            {Math.round(progress)}%
+          </span>
         </div>
-        <Progress value={progress} className="h-2" />
-        
+        <Progress value={progress} className="mt-2 h-[3px] rounded-none" />
+
         {/* Step Indicators */}
-        <div className="flex justify-between">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
           {STEPS.map((step, index) => {
             const StepIcon = step.icon;
             const isActive = index === currentStep;
             const isCompleted = index < currentStep;
-            
+
             return (
               <div
                 key={step.id}
                 className={cn(
-                  "flex flex-col items-center gap-1",
+                  "flex items-center gap-1.5 text-[11px]",
                   isActive && "text-primary",
-                  isCompleted && "text-primary",
-                  !isActive && !isCompleted && "text-muted-foreground"
+                  isCompleted && "text-muted-foreground",
+                  !isActive && !isCompleted && "text-faint",
                 )}
+                aria-current={isActive ? "step" : undefined}
               >
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
-                    isActive && "border-primary bg-primary text-primary-foreground",
-                    isCompleted && "border-primary bg-primary text-primary-foreground",
-                    !isActive && !isCompleted && "border-muted-foreground/30"
-                  )}
-                >
-                  {isCompleted ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : (
-                    <StepIcon className="h-4 w-4" />
-                  )}
-                </div>
-                <span className="hidden text-xs sm:block">{step.title}</span>
+                {isCompleted ? (
+                  <Check className="h-3.5 w-3.5 shrink-0 stroke-[1.6]" />
+                ) : (
+                  <StepIcon className="h-3.5 w-3.5 shrink-0 stroke-[1.6]" />
+                )}
+                <span>{step.title}</span>
               </div>
             );
           })}
@@ -330,14 +373,13 @@ export function OnboardingWizard() {
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-between border-t pt-6">
+      <div className="flex items-center justify-between border-t pt-4">
         <Button
           variant="ghost"
           onClick={handleBack}
           disabled={currentStep === 0}
-          className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 stroke-[1.6]" />
           Back
         </Button>
 
@@ -347,28 +389,20 @@ export function OnboardingWizard() {
               Skip
             </Button>
           )}
-          
+
           {isLastStep ? (
-            <Button
-              onClick={handleComplete}
-              disabled={saving}
-              className="gap-2"
-            >
+            <Button onClick={handleComplete} disabled={saving}>
               {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
               ) : (
-                <Upload className="h-4 w-4" />
+                <Upload className="h-4 w-4 stroke-[1.6]" />
               )}
-              Continue to Portfolio Upload
+              Continue to portfolio upload
             </Button>
           ) : (
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed}
-              className="gap-2"
-            >
+            <Button onClick={handleNext} disabled={!canProceed}>
               Continue
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4 stroke-[1.6]" />
             </Button>
           )}
         </div>
@@ -389,48 +423,45 @@ function RiskStep({
   onChange: (v: string) => void;
 }) {
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Shield className="h-8 w-8 text-primary" />
-        </div>
-        <CardTitle className="text-2xl">What's your risk tolerance?</CardTitle>
-        <CardDescription className="text-base">
-          This helps us understand how much volatility you're comfortable with in your portfolio.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4">
-          {RISK_OPTIONS.map((opt) => {
-            const Icon = opt.icon;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onChange(opt.value)}
+    <StepPanel
+      title="What is your risk tolerance?"
+      description="Sets how much volatility the advisor assumes you can carry before it flags a position."
+    >
+      <div className="grid gap-2">
+        {RISK_OPTIONS.map((opt) => {
+          const Icon = opt.icon;
+          const selected = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              className={cn(
+                OPTION_BASE,
+                "flex items-start gap-3",
+                selected && OPTION_SELECTED,
+              )}
+            >
+              <Icon
                 className={cn(
-                  "flex items-start gap-4 rounded-xl border-2 p-5 text-left transition-all hover:bg-muted/50",
-                  value === opt.value
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border"
+                  "mt-0.5 h-4 w-4 shrink-0 stroke-[1.6]",
+                  selected ? "text-primary" : "text-faint",
                 )}
-              >
-                <div className={cn("rounded-lg bg-muted p-2", opt.color)}>
-                  <Icon className="h-6 w-6" />
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium">{opt.label}</div>
+                <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                  {opt.desc}
                 </div>
-                <div className="flex-1">
-                  <div className="font-semibold">{opt.label}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{opt.desc}</div>
-                </div>
-                {value === opt.value && (
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+              </div>
+              {selected ? (
+                <Check className="h-4 w-4 shrink-0 stroke-[1.6] text-primary" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </StepPanel>
   );
 }
 
@@ -442,41 +473,37 @@ function HorizonStep({
   onChange: (v: string) => void;
 }) {
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Clock className="h-8 w-8 text-primary" />
-        </div>
-        <CardTitle className="text-2xl">What's your investment horizon?</CardTitle>
-        <CardDescription className="text-base">
-          How long do you plan to keep your money invested before you need it?
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {HORIZON_OPTIONS.map((opt) => (
+    <StepPanel
+      title="What is your investment horizon?"
+      description="How long the capital can stay invested before you need it back."
+    >
+      <div className="grid gap-2 sm:grid-cols-3">
+        {HORIZON_OPTIONS.map((opt) => {
+          const selected = value === opt.value;
+          return (
             <button
               key={opt.value}
               type="button"
               onClick={() => onChange(opt.value)}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-xl border-2 p-6 text-center transition-all hover:bg-muted/50",
-                value === opt.value
-                  ? "border-primary bg-primary/5 shadow-sm"
-                  : "border-border"
-              )}
+              className={cn(OPTION_BASE, selected && OPTION_SELECTED)}
             >
-              <div className="text-3xl font-bold text-primary">{opt.years}</div>
-              <div className="font-semibold">{opt.label}</div>
-              <div className="text-xs text-muted-foreground">{opt.desc}</div>
-              {value === opt.value && (
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-              )}
+              <div
+                className={cn(
+                  "font-mono text-[20px] font-semibold leading-none",
+                  selected ? "text-primary" : "text-foreground",
+                )}
+              >
+                {opt.years}
+              </div>
+              <div className="mt-2 text-[13px] font-medium">{opt.label}</div>
+              <div className="mt-0.5 text-[12px] text-muted-foreground">
+                {opt.desc}
+              </div>
             </button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          );
+        })}
+      </div>
+    </StepPanel>
   );
 }
 
@@ -488,76 +515,63 @@ function GoalStep({
   onChange: (v: string) => void;
 }) {
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Target className="h-8 w-8 text-primary" />
-        </div>
-        <CardTitle className="text-2xl">What&apos;s your primary investment goal?</CardTitle>
-        <CardDescription className="text-base">
-          What are you hoping to achieve with your investments?
-        </CardDescription>
-        <p className="mt-3 text-sm font-medium text-foreground">
-          Multiple choice — select{" "}
-          <span className="text-primary">one</span> answer
-        </p>
-      </CardHeader>
-      <CardContent>
-        <fieldset>
-          <legend className="sr-only">Primary investment goal</legend>
-          <div className="space-y-3" role="radiogroup" aria-label="Primary investment goal">
-            {GOAL_OPTIONS.map((opt, index) => {
-              const letter = String.fromCharCode(65 + index);
-              const selected = value === opt.value;
-              return (
-                <label
-                  key={opt.value}
+    <StepPanel
+      title="What is your primary investment goal?"
+      description="The outcome the advisor optimises for when it ranks ideas."
+      hint="Select one"
+    >
+      <fieldset>
+        <legend className="sr-only">Primary investment goal</legend>
+        <div className="grid gap-2" role="radiogroup" aria-label="Primary investment goal">
+          {GOAL_OPTIONS.map((opt, index) => {
+            const letter = String.fromCharCode(65 + index);
+            const selected = value === opt.value;
+            return (
+              <label
+                key={opt.value}
+                className={cn(
+                  OPTION_BASE,
+                  "flex cursor-pointer items-start gap-3",
+                  "focus-within:border-primary",
+                  selected && OPTION_SELECTED,
+                )}
+              >
+                <input
+                  type="radio"
+                  name="onboarding-investment-goal"
+                  value={opt.value}
+                  checked={selected}
+                  onChange={() => onChange(opt.value)}
+                  className="sr-only"
+                />
+                <span
                   className={cn(
-                    "flex cursor-pointer items-stretch gap-3 rounded-xl border-2 p-4 text-left transition-all hover:bg-muted/40",
-                    "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+                    "flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[11px] font-medium",
                     selected
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border",
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "bg-background text-faint",
                   )}
+                  aria-hidden
                 >
-                  <input
-                    type="radio"
-                    name="onboarding-investment-goal"
-                    value={opt.value}
-                    checked={selected}
-                    onChange={() => onChange(opt.value)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold",
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-muted-foreground/30 bg-muted/50 text-muted-foreground",
-                    )}
-                    aria-hidden
-                  >
-                    {letter}
+                  {letter}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium">
+                    {opt.label}
                   </span>
-                  <span className="text-2xl leading-none" aria-hidden>
-                    {opt.emoji}
+                  <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">
+                    {opt.desc}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold">{opt.label}</span>
-                    <span className="mt-0.5 block text-sm text-muted-foreground">
-                      {opt.desc}
-                    </span>
-                  </span>
-                  {selected && (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                  )}
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-      </CardContent>
-    </Card>
+                </span>
+                {selected && (
+                  <Check className="h-4 w-4 shrink-0 stroke-[1.6] text-primary" aria-hidden />
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+    </StepPanel>
   );
 }
 
@@ -569,73 +583,63 @@ function AssetStep({
   onChange: (v: string) => void;
 }) {
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <BarChart3 className="h-8 w-8 text-primary" />
-        </div>
-        <CardTitle className="text-2xl">What&apos;s your asset preference?</CardTitle>
-        <CardDescription className="text-base">
-          Do you prefer index funds/ETFs or individual stocks?
-        </CardDescription>
-        <p className="mt-3 text-sm font-medium text-foreground">
-          Multiple choice — select{" "}
-          <span className="text-primary">one</span> answer
-        </p>
-      </CardHeader>
-      <CardContent>
-        <fieldset>
-          <legend className="sr-only">Asset preference</legend>
-          <div className="space-y-3" role="radiogroup" aria-label="Asset preference">
-            {ASSET_OPTIONS.map((opt, index) => {
-              const letter = String.fromCharCode(65 + index);
-              const selected = value === opt.value;
-              return (
-                <label
-                  key={opt.value}
+    <StepPanel
+      title="What is your asset preference?"
+      description="Whether you want index exposure, single names, or a mix of both."
+      hint="Select one"
+    >
+      <fieldset>
+        <legend className="sr-only">Asset preference</legend>
+        <div className="grid gap-2" role="radiogroup" aria-label="Asset preference">
+          {ASSET_OPTIONS.map((opt, index) => {
+            const letter = String.fromCharCode(65 + index);
+            const selected = value === opt.value;
+            return (
+              <label
+                key={opt.value}
+                className={cn(
+                  OPTION_BASE,
+                  "flex cursor-pointer items-start gap-3",
+                  "focus-within:border-primary",
+                  selected && OPTION_SELECTED,
+                )}
+              >
+                <input
+                  type="radio"
+                  name="onboarding-asset-preference"
+                  value={opt.value}
+                  checked={selected}
+                  onChange={() => onChange(opt.value)}
+                  className="sr-only"
+                />
+                <span
                   className={cn(
-                    "flex cursor-pointer items-stretch gap-3 rounded-xl border-2 p-4 text-left transition-all hover:bg-muted/40",
-                    "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+                    "flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[11px] font-medium",
                     selected
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border",
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "bg-background text-faint",
                   )}
+                  aria-hidden
                 >
-                  <input
-                    type="radio"
-                    name="onboarding-asset-preference"
-                    value={opt.value}
-                    checked={selected}
-                    onChange={() => onChange(opt.value)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 text-sm font-bold",
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-muted-foreground/30 bg-muted/50 text-muted-foreground",
-                    )}
-                    aria-hidden
-                  >
-                    {letter}
+                  {letter}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium">
+                    {opt.label}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold">{opt.label}</span>
-                    <span className="mt-0.5 block text-sm text-muted-foreground">
-                      {opt.desc}
-                    </span>
+                  <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">
+                    {opt.desc}
                   </span>
-                  {selected && (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                  )}
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-      </CardContent>
-    </Card>
+                </span>
+                {selected && (
+                  <Check className="h-4 w-4 shrink-0 stroke-[1.6] text-primary" aria-hidden />
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+    </StepPanel>
   );
 }
 
@@ -671,70 +675,55 @@ function SectorsStep({
   }
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Briefcase className="h-8 w-8 text-primary" />
-        </div>
-        <CardTitle className="text-2xl">Any sector preferences?</CardTitle>
-        <CardDescription className="text-base">
-          Optional: Select sectors you prefer or want to avoid. You can skip this step.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <StepPanel
+      title="Any sector preferences?"
+      description="Optional. Mark the sectors you want weighted up and the ones you want excluded."
+    >
+      <div className="space-y-5">
         <div>
-          <Label className="text-base font-medium">Preferred Sectors</Label>
-          <p className="mb-3 text-sm text-muted-foreground">
-            Click to add sectors you're interested in
+          <Label className="text-[12.5px]">Preferred sectors</Label>
+          <p className="mb-2.5 mt-1 text-[12px] text-muted-foreground">
+            Sectors you want the advisor to lean into.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {COMMON_SECTORS.map((sector) => {
-              const isSelected = preferred.includes(sector);
-              return (
-                <Badge
-                  key={sector}
-                  variant={isSelected ? "default" : "outline"}
-                  className="cursor-pointer px-3 py-1.5 text-sm transition-colors hover:bg-primary/80"
-                  onClick={() => toggleSector(sector, "preferred")}
-                >
-                  {isSelected && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                  {sector}
-                </Badge>
-              );
-            })}
+          <div className="flex flex-wrap gap-1.5">
+            {COMMON_SECTORS.map((sector) => (
+              <Chip
+                key={sector}
+                selected={preferred.includes(sector)}
+                onClick={() => toggleSector(sector, "preferred")}
+              >
+                {sector}
+              </Chip>
+            ))}
           </div>
         </div>
 
         <div>
-          <Label className="text-base font-medium">Sectors to Avoid</Label>
-          <p className="mb-3 text-sm text-muted-foreground">
-            Click to mark sectors you prefer not to invest in
+          <Label className="text-[12.5px]">Sectors to avoid</Label>
+          <p className="mb-2.5 mt-1 text-[12px] text-muted-foreground">
+            Sectors the advisor should never recommend.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {COMMON_SECTORS.map((sector) => {
-              const isSelected = avoided.includes(sector);
-              return (
-                <Badge
-                  key={sector}
-                  variant={isSelected ? "destructive" : "outline"}
-                  className="cursor-pointer px-3 py-1.5 text-sm transition-colors"
-                  onClick={() => toggleSector(sector, "avoided")}
-                >
-                  {isSelected && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                  {sector}
-                </Badge>
-              );
-            })}
+          <div className="flex flex-wrap gap-1.5">
+            {COMMON_SECTORS.map((sector) => (
+              <Chip
+                key={sector}
+                selected={avoided.includes(sector)}
+                tone="destructive"
+                onClick={() => toggleSector(sector, "avoided")}
+              >
+                {sector}
+              </Chip>
+            ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </StepPanel>
   );
 }
 
 const STRATEGY_PROMPTS = [
   "I want to grow this account aggressively over 10+ years and I'm fine with drawdowns along the way.",
-  "Let my winners run — don't tell me to trim a position just because it got big.",
+  "Let my winners run. Don't tell me to trim a position just because it got big.",
   "I like founder-led tech and energy names; never suggest tobacco or gambling.",
   "Show me where I can realistically add return, not only where to be safe.",
 ];
@@ -747,88 +736,75 @@ function StrategyMessageStep({
   onChange: (v: string) => void;
 }) {
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <MessageSquare className="h-8 w-8 text-primary" />
-        </div>
-        <CardTitle className="text-2xl">
-          Tell us your goals and strategy
-        </CardTitle>
-        <CardDescription className="text-base">
-          Optional, but this is the single most useful thing you can give the
-          AI. It weights your own words above the choices you just made.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <StepPanel
+      title="Describe your strategy in your own words"
+      description="Optional, and the single most useful input you can give. The AI weights this above the selections you just made."
+    >
+      <div className="space-y-3">
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           maxLength={2000}
           placeholder="e.g. I'm building long-term wealth and can stomach big swings. I want ideas that meaningfully beat the index, not just safe diversification. I follow AI infrastructure and energy closely, and I never want exposure to tobacco."
-          className="min-h-[180px] text-base"
+          className="min-h-[180px]"
         />
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Return expectations, risk appetite, themes you like or refuse.</span>
-          <span>{value.length}/2000</span>
+        <div className="flex items-center justify-between gap-3 text-[11px] text-faint">
+          <span>
+            Return expectations, risk appetite, themes you like or refuse.
+          </span>
+          <span className="font-mono">{value.length}/2000</span>
         </div>
-        <div className="rounded-lg border bg-muted/30 p-4">
-          <p className="mb-2 text-sm font-medium">Need a starting point?</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="border bg-background p-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-faint">
+            Starting points
+          </p>
+          <div className="flex flex-wrap gap-1.5">
             {STRATEGY_PROMPTS.map((prompt) => (
-              <Badge
+              <Chip
                 key={prompt}
-                variant="outline"
-                className="cursor-pointer px-3 py-1.5 text-left text-xs font-normal transition-colors hover:bg-primary/10"
                 onClick={() =>
                   onChange(value.trim() ? `${value.trim()} ${prompt}` : prompt)
                 }
               >
                 + {prompt}
-              </Badge>
+              </Chip>
             ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </StepPanel>
   );
 }
 
 function CompleteStep({ profileData }: { profileData: ProfileData }) {
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-          <Sparkles className="h-8 w-8 text-green-600 dark:text-green-400" />
-        </div>
-        <CardTitle className="text-2xl">Your profile is ready!</CardTitle>
-        <CardDescription className="text-base">
-          Here's a summary of your investment preferences. Now let's import your portfolio.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-lg border bg-muted/30 p-6">
+    <StepPanel
+      title="Profile complete"
+      description="Review the mandate below, then import your holdings so the advisor has something to analyse."
+    >
+      <div className="space-y-4">
+        <div className="border bg-background p-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <SummaryItem label="Risk Tolerance" value={formatValue(profileData.riskTolerance)} />
-            <SummaryItem label="Investment Horizon" value={formatValue(profileData.investmentHorizon)} />
-            <SummaryItem label="Investment Goal" value={formatValue(profileData.investmentGoal)} />
-            <SummaryItem label="Asset Preference" value={formatValue(profileData.assetPreference)} />
+            <SummaryItem label="Risk tolerance" value={formatValue(profileData.riskTolerance)} />
+            <SummaryItem label="Investment horizon" value={formatValue(profileData.investmentHorizon)} />
+            <SummaryItem label="Investment goal" value={formatValue(profileData.investmentGoal)} />
+            <SummaryItem label="Asset preference" value={formatValue(profileData.assetPreference)} />
           </div>
-          
+
           {(profileData.preferredSectors.length > 0 || profileData.avoidedSectors.length > 0) && (
-            <div className="mt-4 border-t pt-4">
+            <div className="mt-4 space-y-1 border-t pt-4">
               {profileData.preferredSectors.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-sm font-medium">Preferred: </span>
-                  <span className="text-sm text-muted-foreground">
+                <div className="text-[12.5px]">
+                  <span className="font-medium">Preferred: </span>
+                  <span className="text-muted-foreground">
                     {profileData.preferredSectors.join(", ")}
                   </span>
                 </div>
               )}
               {profileData.avoidedSectors.length > 0 && (
-                <div>
-                  <span className="text-sm font-medium">Avoiding: </span>
-                  <span className="text-sm text-muted-foreground">
+                <div className="text-[12.5px]">
+                  <span className="font-medium">Avoiding: </span>
+                  <span className="text-muted-foreground">
                     {profileData.avoidedSectors.join(", ")}
                   </span>
                 </div>
@@ -838,35 +814,40 @@ function CompleteStep({ profileData }: { profileData: ProfileData }) {
 
           {profileData.strategyMessage.trim().length > 0 && (
             <div className="mt-4 border-t pt-4">
-              <div className="text-sm font-medium">Your strategy</div>
-              <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">
+              <div className="text-[11px] uppercase tracking-wide text-faint">
+                Your strategy
+              </div>
+              <p className="mt-1 whitespace-pre-line text-[12.5px] leading-relaxed text-muted-foreground">
                 {profileData.strategyMessage.trim()}
               </p>
             </div>
           )}
         </div>
 
-        <div className="mt-6 rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-start gap-3">
-            <Upload className="mt-0.5 h-5 w-5 text-primary" />
-            <div>
-              <div className="font-medium">Next: Import your portfolio</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Upload a CSV or screenshot of your holdings so we can analyze your investments.
-              </div>
+        <div className="flex items-start gap-3 border bg-background p-4">
+          <Upload className="mt-0.5 h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+          <div>
+            <div className="text-[13px] font-medium">
+              Next: import your portfolio
+            </div>
+            <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+              Upload a CSV or a screenshot of your holdings and the analysis
+              runs against this profile.
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </StepPanel>
   );
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="font-medium">{value}</div>
+      <div className="text-[11px] uppercase tracking-wide text-faint">
+        {label}
+      </div>
+      <div className="mt-0.5 text-[13px] font-medium">{value}</div>
     </div>
   );
 }

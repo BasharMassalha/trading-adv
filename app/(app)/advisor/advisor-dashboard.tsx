@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Newspaper,
   RefreshCw,
-  Shield,
   Sparkles,
   Target,
   TrendingUp,
@@ -23,15 +22,9 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/layout/page-header";
 import { AdvisorChat } from "./advisor-chat";
 import {
   PortfolioNewsSection,
@@ -41,6 +34,10 @@ import type { ReportView, InvestorProfileView } from "@/server/services/analysis
 import { TickerContextDrawer } from "@/components/advisor/ticker-context-drawer";
 import { HoldingsSlideshow } from "@/components/advisor/holdings-slideshow";
 import { BriefingPlayer } from "@/components/advisor/briefing-player";
+import {
+  AdvisorPortfolioPicker,
+  type AdvisorPortfolioOption,
+} from "@/components/advisor/advisor-portfolio-picker";
 
 type PortfolioSummary = {
   id: string;
@@ -59,6 +56,7 @@ type Readiness = {
 };
 
 type Props = {
+  portfolios: AdvisorPortfolioOption[];
   portfolio: PortfolioSummary | null;
   investorProfile: InvestorProfileView | null;
   latestReport: ReportView | null;
@@ -67,6 +65,7 @@ type Props = {
 };
 
 export function AdvisorDashboard({
+  portfolios,
   portfolio,
   investorProfile,
   latestReport,
@@ -146,26 +145,21 @@ export function AdvisorDashboard({
   // ── No portfolio state ───────────────────────────────────────────────────
   if (!portfolio) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 py-12">
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <Upload className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Import your portfolio to get started
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            The AI advisor needs portfolio data to analyze. Upload a CSV or
-            screenshot to begin.
+      <div className="space-y-5">
+        <PageHeader
+          title="AI advisor"
+          description="The advisor works from your holdings. Import a CSV or a screenshot to begin."
+        />
+        <div className="border border-dashed bg-surface p-8 text-center">
+          <p className="text-[13px] text-muted-foreground">
+            No portfolio on this account yet.
           </p>
-        </div>
-        <div className="flex justify-center">
-          <Link href="/portfolio/upload">
-            <Button size="lg" className="gap-2">
-              <Upload className="h-4 w-4" />
+          <Button className="mt-4 gap-2" asChild>
+            <Link href="/portfolio/upload">
+              <Upload className="h-4 w-4 stroke-[1.6]" />
               Import portfolio
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
     );
@@ -175,121 +169,124 @@ export function AdvisorDashboard({
   const showSetupPrompts = !investorProfile || !readiness?.isEnriched;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">AI Advisor</h1>
-          <p className="text-sm text-muted-foreground">
-            Personalized portfolio analysis and recommendations
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="gap-1">
-            <FileText className="h-3 w-3" />
-            {portfolio.name}
-          </Badge>
-          {latestReport && (
-            <Badge variant="secondary" className="gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              Report ready
-            </Badge>
-          )}
-          {latestReport && (
-            <Button
-              size="sm"
-              variant="default"
-              className="gap-1.5"
-              onClick={() => setShowBriefing(true)}
-            >
-              <Film className="h-3.5 w-3.5" />
-              Watch briefing
-            </Button>
-          )}
-          {latestReport?.actionPlan?.holdingsToReview &&
-            latestReport.actionPlan.holdingsToReview.some(
-              (h) => h.ticker && h.ticker !== "BLEND",
-            ) && (
+    <div className="space-y-5">
+      <PageHeader
+        title="AI advisor"
+        description="Analysis, news, and chat for the portfolio you select below."
+        actions={
+          <>
+            {portfolio && portfolios.length > 0 ? (
+              <AdvisorPortfolioPicker
+                portfolios={portfolios}
+                selectedId={portfolio.id}
+              />
+            ) : null}
+            {latestReport && (
+              <Badge variant="success" className="gap-1.5">
+                <CheckCircle2 className="h-3 w-3 shrink-0 stroke-[1.6]" />
+                Report ready
+              </Badge>
+            )}
+            {latestReport && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="default"
                 className="gap-1.5"
-                onClick={() => setShowSlideshow(true)}
+                onClick={() => setShowBriefing(true)}
               >
-                <Sparkles className="h-3.5 w-3.5" />
-                Walk through stocks
+                <Film className="h-3.5 w-3.5 stroke-[1.6]" />
+                Watch briefing
               </Button>
             )}
-        </div>
-      </div>
+            {latestReport?.actionPlan?.holdingsToReview &&
+              latestReport.actionPlan.holdingsToReview.some(
+                (h) => h.ticker && h.ticker !== "BLEND",
+              ) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setShowSlideshow(true)}
+                >
+                  <Sparkles className="h-3.5 w-3.5 stroke-[1.6]" />
+                  Walk through stocks
+                </Button>
+              )}
+          </>
+        }
+      />
 
       {/* Setup prompts */}
       {showSetupPrompts && (
         <div className="grid gap-4 sm:grid-cols-2">
           {!investorProfile && (
-            <Card className="border-amber-500/30 bg-amber-500/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <User className="h-4 w-4 text-amber-600" />
+            <div className="border bg-surface p-5">
+              <div className="text-[11px] uppercase tracking-wide text-faint">
+                Setup
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <User className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+                <h3 className="text-[13.5px] font-semibold">
                   Set up your investor profile
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Get personalized analysis by telling us your risk tolerance
-                  and goals.
-                </p>
+                </h3>
+              </div>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+                Risk tolerance and goals let the analysis speak to your
+                situation rather than a generic book.
+              </p>
+              <Button variant="outline" size="sm" className="mt-3.5 gap-1.5" asChild>
                 <Link href="/settings/investor-profile">
-                  <Button variant="outline" size="sm" className="gap-1">
-                    Complete profile
-                    <ArrowRight className="h-3 w-3" />
-                  </Button>
+                  Complete profile
+                  <ArrowRight className="h-3.5 w-3.5 stroke-[1.6]" />
                 </Link>
-              </CardContent>
-            </Card>
+              </Button>
+            </div>
           )}
 
           {!readiness?.isEnriched && (
-            <Card className="border-blue-500/30 bg-blue-500/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <RefreshCw className="h-4 w-4 text-blue-600" />
-                  Enrich with market data
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Fetch current prices and market data for accurate analysis.
-                </p>
+            <div className="border bg-surface p-5">
+              <div className="text-[11px] uppercase tracking-wide text-faint">
+                Setup
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+                <h3 className="text-[13.5px] font-semibold">
+                  Load market data
+                </h3>
+              </div>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+                Current prices are needed to value the book and weight the
+                analysis correctly.
+              </p>
+              <Button variant="outline" size="sm" className="mt-3.5 gap-1.5" asChild>
                 <Link href={`/portfolio/${portfolio.id}`}>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    Go to portfolio
-                    <ArrowRight className="h-3 w-3" />
-                  </Button>
+                  Go to portfolio
+                  <ArrowRight className="h-3.5 w-3.5 stroke-[1.6]" />
                 </Link>
-              </CardContent>
-            </Card>
+              </Button>
+            </div>
           )}
         </div>
       )}
 
       {/* Main content */}
       <Tabs defaultValue={latestReport ? "report" : "news"} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3">
+        <TabsList>
           <TabsTrigger value="report" className="gap-2">
-            <FileText className="h-4 w-4" />
+            <FileText className="h-4 w-4 stroke-[1.6]" />
             Analysis
           </TabsTrigger>
           <TabsTrigger value="news" className="gap-2">
-            <Newspaper className="h-4 w-4" />
+            <Newspaper className="h-4 w-4 stroke-[1.6]" />
             News
           </TabsTrigger>
           <TabsTrigger value="chat" className="gap-2">
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4 stroke-[1.6]" />
             Chat
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="news" className="mt-6">
+        <TabsContent value="news" className="mt-5">
           {newsBundle ? (
             <PortfolioNewsSection
               bundle={newsBundle}
@@ -298,7 +295,7 @@ export function AdvisorDashboard({
           ) : null}
         </TabsContent>
 
-        <TabsContent value="report" className="mt-6">
+        <TabsContent value="report" className="mt-5">
           {latestReport ? (
             <ReportDisplay report={latestReport} onTickerPulse={setPulseTicker} />
           ) : (
@@ -312,7 +309,7 @@ export function AdvisorDashboard({
 
           {/* Generate / regenerate button */}
           {latestReport && (
-            <div className="mt-6 flex items-center justify-center gap-4">
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <Button
                 onClick={generateAnalysis}
                 disabled={generating || !readiness?.ready}
@@ -320,24 +317,24 @@ export function AdvisorDashboard({
               >
                 {generating ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing… (may take 2–3 min)
+                    <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
+                    Analysing, usually 2–3 min
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="h-4 w-4" />
+                    <RefreshCw className="h-4 w-4 stroke-[1.6]" />
                     Regenerate analysis
                   </>
                 )}
               </Button>
               {error && (
-                <span className="text-sm text-destructive">{error}</span>
+                <span className="text-[12.5px] text-destructive">{error}</span>
               )}
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="chat" className="mt-6">
+        <TabsContent value="chat" className="mt-5">
           <div className="h-[calc(100vh-20rem)]">
             <AdvisorChat portfolioId={portfolio.id} />
           </div>
@@ -345,10 +342,9 @@ export function AdvisorDashboard({
       </Tabs>
 
       {/* Disclaimer */}
-      <p className="text-center text-xs text-muted-foreground">
-        <Sparkles className="mr-1 inline-block h-3 w-3" />
-        AI analysis is informational only — not financial advice. Always do your
-        own research before making investment decisions.
+      <p className="text-center text-[11px] text-faint">
+        Informational only, not financial advice. Verify against your own plan
+        before acting.
       </p>
 
       <TickerContextDrawer
@@ -391,43 +387,37 @@ function EmptyReportState({
   const canGenerate = readiness?.ready ?? false;
 
   return (
-    <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center justify-center py-12">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Sparkles className="h-8 w-8 text-primary" />
-        </div>
-        <h3 className="text-lg font-semibold">Generate your first analysis</h3>
-        <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">
-          {canGenerate
-            ? "Click below to generate a comprehensive AI analysis of your portfolio."
-            : readiness?.message ??
-              "Complete the setup steps above to unlock analysis."}
-        </p>
+    <div className="border border-dashed bg-surface p-8 text-center">
+      <h3 className="text-[14px] font-semibold">No analysis yet</h3>
+      <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+        {canGenerate
+          ? "Run the first pass to get strengths, risks, and an action plan for this book."
+          : readiness?.message ??
+            "Complete the setup steps above to unlock analysis."}
+      </p>
 
-        <Button
-          onClick={onGenerate}
-          disabled={!canGenerate || generating}
-          className="mt-6 gap-2"
-          size="lg"
-        >
-          {generating ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Analyzing… (may take 2–3 min)
-            </>
-          ) : (
-            <>
-              <Zap className="h-4 w-4" />
-              Generate analysis
-            </>
-          )}
-        </Button>
-
-        {error && (
-          <p className="mt-4 text-sm text-destructive">{error}</p>
+      <Button
+        onClick={onGenerate}
+        disabled={!canGenerate || generating}
+        className="mt-5 gap-2"
+      >
+        {generating ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
+            Analysing, usually 2–3 min
+          </>
+        ) : (
+          <>
+            <Zap className="h-4 w-4 stroke-[1.6]" />
+            Generate analysis
+          </>
         )}
-      </CardContent>
-    </Card>
+      </Button>
+
+      {error && (
+        <p className="mt-4 text-[12.5px] text-destructive">{error}</p>
+      )}
+    </div>
   );
 }
 
@@ -439,67 +429,64 @@ function ReportDisplay({
   onTickerPulse: (ticker: string) => void;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Summary
-          </CardTitle>
-          <CardDescription>
-            <span className="block text-xs text-muted-foreground/90">
-              Analysis may incorporate recent company and market news for your
-              largest positions. See the <strong>News</strong> tab for the
-              articles used.
-            </span>
-            {report.generatedAt && (
-              <span className="mt-1 block text-sm">
-                Generated{" "}
-                {new Date(report.generatedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-                {report.modelUsed && (
-                  <span className="ml-2 text-xs">({report.modelUsed})</span>
-                )}
-              </span>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="leading-relaxed text-foreground/90">{report.summary}</p>
-        </CardContent>
-      </Card>
+      <div className="border bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b px-5 py-3.5">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+            <h2 className="text-[13.5px] font-semibold tracking-tight">
+              Summary
+            </h2>
+          </div>
+          {report.generatedAt && (
+            <div className="font-mono text-[11px] text-faint">
+              {new Date(report.generatedAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+              {report.modelUsed ? ` · ${report.modelUsed}` : ""}
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-[13px] leading-relaxed">{report.summary}</p>
+          <p className="mt-3.5 border-t pt-3 text-[11.5px] leading-relaxed text-faint">
+            May incorporate recent company and market news for your largest
+            positions. The News tab lists the articles used.
+          </p>
+        </div>
+      </div>
 
-      {/* Action Plan - NEW prominent section */}
+      {/* Action plan */}
       {report.actionPlan && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              Action Plan
-            </CardTitle>
-            <CardDescription>
-              Holdings to review, ideas for new names to research, and rebalancing — grounded in
-              this analysis. Not personal financial advice.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Holdings to Review */}
+        <div className="border bg-surface">
+          <div className="border-b px-5 py-3.5">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+              <h2 className="text-[13.5px] font-semibold tracking-tight">
+                Action plan
+              </h2>
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              Holdings to review, names to research, and rebalancing steps drawn
+              from this analysis. Not personal financial advice.
+            </p>
+          </div>
+          <div className="divide-y">
+            {/* Holdings to review */}
             {report.actionPlan.holdingsToReview && report.actionPlan.holdingsToReview.length > 0 && (
-              <div>
-                <h4 className="mb-3 font-semibold">Holdings to Review</h4>
-                <div className="space-y-3">
+              <div className="px-5 py-4">
+                <h3 className="text-[13px] font-semibold">
+                  Holdings to review
+                </h3>
+                <div className="mt-3 space-y-2.5">
                   {report.actionPlan.holdingsToReview.map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex flex-col gap-3 rounded-lg border bg-background p-3"
-                    >
-                      <div className="flex items-start gap-3">
+                    <div key={i} className="border bg-background">
+                      <div className="flex items-start gap-3 p-3.5">
                         <button
                           type="button"
                           onClick={() =>
@@ -520,39 +507,38 @@ function ReportDisplay({
                                     ? "success"
                                     : "secondary"
                             }
-                            className="cursor-pointer font-mono text-xs hover:opacity-90"
+                            className="cursor-pointer font-mono font-semibold"
                           >
                             {h.ticker}
                           </Badge>
                         </button>
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-sm font-medium">
+                            <div className="text-[13px] font-medium">
                               {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
                             </div>
                             {h.verdict && (
-                              <Badge
-                                variant="outline"
-                                className="font-mono text-[10px] tracking-wide"
-                              >
+                              <Badge variant="outline" className="font-mono">
                                 {h.verdict}
                                 {h.conviction ? ` · ${h.conviction[0]}-conv` : ""}
                               </Badge>
                             )}
                           </div>
-                          <p className="mt-1 text-sm text-muted-foreground">{h.reason}</p>
+                          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                            {h.reason}
+                          </p>
                           {!h.ticker || h.ticker === "BLEND" ? null : (
-                            <div className="mt-2 flex flex-wrap items-center gap-3">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                               <button
                                 type="button"
                                 onClick={() => onTickerPulse(h.ticker)}
-                                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                                className="text-[12px] font-medium text-primary underline-offset-4 hover:underline"
                               >
-                                What’s moving lately →
+                                What’s moving lately
                               </button>
                               {(h.thesis || (h.bullCase?.length ?? 0) > 0) && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  Tap “Walk through stocks” for the full read
+                                <span className="text-[11px] text-faint">
+                                  Open “Walk through stocks” for the full read
                                 </span>
                               )}
                             </div>
@@ -560,17 +546,17 @@ function ReportDisplay({
                         </div>
                       </div>
                       {(h.todoItems?.length ?? 0) > 0 && (
-                        <div className="border-t border-border/60 pt-3">
-                          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <div className="border-t px-3.5 py-3">
+                          <div className="text-[11px] uppercase tracking-wide text-faint">
                             To-do
                           </div>
-                          <ul className="space-y-1.5">
+                          <ul className="mt-2 space-y-1.5">
                             {(h.todoItems ?? []).map((task, ti) => (
                               <li
                                 key={ti}
-                                className="flex gap-2 text-sm leading-snug text-foreground/90"
+                                className="flex gap-2.5 text-[12.5px] leading-relaxed"
                               >
-                                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mono text-[10px] font-semibold text-primary">
+                                <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
                                   {ti + 1}
                                 </span>
                                 <span>{task}</span>
@@ -585,30 +571,40 @@ function ReportDisplay({
               </div>
             )}
 
-            {/* Potential Additions */}
+            {/* Potential additions */}
             {report.actionPlan.potentialAdditions && report.actionPlan.potentialAdditions.length > 0 && (
-              <div>
-                <h4 className="mb-1 font-semibold">Stocks & ETFs to consider (research next)</h4>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Specific symbols for your watchlist. Informational only — not a recommendation to buy
-                  or sell. Verify against your plan, costs, and tax situation.
+              <div className="px-5 py-4">
+                <h3 className="text-[13px] font-semibold">
+                  Stocks and ETFs to research next
+                </h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  Symbols for your watchlist. Informational only, not a
+                  recommendation to buy or sell. Verify against your plan,
+                  costs, and tax situation.
                 </p>
-                <div className="space-y-3">
+                <div className="mt-3 space-y-2.5">
                   {report.actionPlan.potentialAdditions.map((a, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 rounded-lg border bg-background p-3"
+                      className="flex items-start gap-3 border bg-background p-3.5"
                     >
                       {a.ticker ? (
-                        <Badge variant="secondary" className="shrink-0 font-mono text-xs">
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 font-mono font-semibold"
+                        >
                           {a.ticker}
                         </Badge>
                       ) : (
-                        <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                        <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
                       )}
-                      <div>
-                        <div className="text-sm font-medium">{a.suggestion}</div>
-                        <p className="mt-1 text-sm text-muted-foreground">{a.rationale}</p>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium">
+                          {a.suggestion}
+                        </div>
+                        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                          {a.rationale}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -616,17 +612,17 @@ function ReportDisplay({
               </div>
             )}
 
-            {/* Rebalancing Steps */}
+            {/* Rebalancing steps */}
             {report.actionPlan.rebalancingSteps && report.actionPlan.rebalancingSteps.length > 0 && (
-              <div>
-                <h4 className="mb-3 font-semibold">Rebalancing Steps</h4>
-                <ol className="space-y-2">
+              <div className="px-5 py-4">
+                <h3 className="text-[13px] font-semibold">Rebalancing steps</h3>
+                <ol className="mt-3 space-y-2">
                   {report.actionPlan.rebalancingSteps.map((step, i) => (
                     <li
                       key={i}
-                      className="flex gap-3 rounded-lg border bg-background p-3 text-sm"
+                      className="flex gap-3 border bg-background p-3.5 text-[12.5px] leading-relaxed"
                     >
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                      <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
                         {i + 1}
                       </span>
                       <span className="text-muted-foreground">{step}</span>
@@ -635,128 +631,109 @@ function ReportDisplay({
                 </ol>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Grid of sections */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="hairline-grid grid md:grid-cols-2">
         {/* Strengths */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              Strengths
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {report.strengths.map((s, i) => (
-                <li
-                  key={i}
-                  className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
-                >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
-                  {s}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 stroke-[1.6] text-success" />
+            <h3 className="text-[13.5px] font-semibold">Strengths</h3>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {report.strengths.map((s, i) => (
+              <li
+                key={i}
+                className="flex gap-2.5 text-[12.5px] leading-relaxed text-muted-foreground"
+              >
+                <span className="mt-[7px] h-1 w-1 shrink-0 bg-success" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {/* Risks */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              Potential Risks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {report.risks.map((r, i) => (
-                <li
-                  key={i}
-                  className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
-                >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                  {r}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 stroke-[1.6] text-warning" />
+            <h3 className="text-[13.5px] font-semibold">Potential risks</h3>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {report.risks.map((r, i) => (
+              <li
+                key={i}
+                className="flex gap-2.5 text-[12.5px] leading-relaxed text-muted-foreground"
+              >
+                <span className="mt-[7px] h-1 w-1 shrink-0 bg-warning" />
+                <span>{r}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {/* Opportunities */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Lightbulb className="h-4 w-4 text-blue-600" />
-              Opportunities
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {report.opportunities.map((o, i) => (
-                <li
-                  key={i}
-                  className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
-                >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                  {o}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 shrink-0 stroke-[1.6] text-primary" />
+            <h3 className="text-[13.5px] font-semibold">Opportunities</h3>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {report.opportunities.map((o, i) => (
+              <li
+                key={i}
+                className="flex gap-2.5 text-[12.5px] leading-relaxed text-muted-foreground"
+              >
+                <span className="mt-[7px] h-1 w-1 shrink-0 bg-primary" />
+                <span>{o}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-        {/* Suggested Actions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Target className="h-4 w-4 text-purple-600" />
-              Suggested Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {report.suggestedActions.map((a, i) => (
-                <li
-                  key={i}
-                  className="flex gap-2 text-sm leading-relaxed text-muted-foreground"
-                >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500" />
-                  {a}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        {/* Suggested actions */}
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+            <h3 className="text-[13.5px] font-semibold">Suggested actions</h3>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {report.suggestedActions.map((a, i) => (
+              <li
+                key={i}
+                className="flex gap-2.5 text-[12.5px] leading-relaxed text-muted-foreground"
+              >
+                <span className="mt-[7px] h-1 w-1 shrink-0 bg-faint" />
+                <span>{a}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      {/* Follow-up Questions */}
+      {/* Follow-up questions */}
       {report.followUpQuestions.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              Questions to Consider
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {report.followUpQuestions.map((q, i) => (
-                <Badge
-                  key={i}
-                  variant="secondary"
-                  className="cursor-default font-normal"
-                >
-                  {q}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="border bg-surface p-5">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+            <h3 className="text-[13.5px] font-semibold">
+              Questions to consider
+            </h3>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {report.followUpQuestions.map((q, i) => (
+              <span
+                key={i}
+                className="rounded-md border bg-background px-2.5 py-1.5 text-[12px] text-muted-foreground"
+              >
+                {q}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

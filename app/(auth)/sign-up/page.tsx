@@ -17,16 +17,16 @@ export default function SignUpPage() {
   const googleEnabled = isGoogleOAuthConfigured();
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Create your account</CardTitle>
+    <Card className="p-1">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-[22px]">Create your account</CardTitle>
         <CardDescription>
-          Start analysing your portfolio in minutes.
+          Set your mandate, import a book, and read the first report in minutes.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <SignUpForm googleEnabled={googleEnabled} />
-        <p className="mt-6 text-center text-sm text-muted-foreground">
+        <p className="mt-6 text-[13px] text-muted-foreground">
           Already have an account?{" "}
           <Link
             href="/sign-in"

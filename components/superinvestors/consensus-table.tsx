@@ -29,69 +29,71 @@ export function ConsensusTable({
   tone,
 }: Props) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <h3 className="text-[13.5px] font-semibold tracking-tight">{title}</h3>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {description}
+        </p>
       </div>
 
       {positions.length === 0 ? (
-        <p className="rounded-lg border border-dashed bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
+        <div className="border border-dashed bg-surface p-8 text-center text-[13px] text-muted-foreground">
           {emptyHint}
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ticker</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="text-right">Holders</TableHead>
-                <TableHead className="text-right">Avg weight</TableHead>
-                <TableHead>Who</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {positions.map((p) => (
-                <TableRow key={`${tone}-${p.ticker}`}>
-                  <TableCell className="font-mono font-medium">
-                    {p.ticker}
-                  </TableCell>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant={tone === "long" ? "default" : "destructive"}
-                      className="text-[10px]"
-                    >
-                      {p.holderCount}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatPercent(p.avgWeightPct)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {p.holders.slice(0, 6).map((h) => (
-                        <Link
-                          key={h.id}
-                          href={`/superinvestors/${h.id}`}
-                          className="text-xs text-primary underline-offset-2 hover:underline"
-                        >
-                          {h.name.split(" ").slice(-1)[0]}
-                        </Link>
-                      ))}
-                      {p.holders.length > 6 ? (
-                        <span className="text-xs text-muted-foreground">
-                          +{p.holders.length - 6}
-                        </span>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ticker</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead className="text-right">Holders</TableHead>
+              <TableHead className="text-right">Avg weight</TableHead>
+              <TableHead>Who</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {positions.map((p) => (
+              <TableRow key={`${tone}-${p.ticker}`}>
+                <TableCell className="font-mono font-semibold">
+                  {p.ticker}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {p.name}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Badge
+                    variant={tone === "long" ? "info" : "destructive"}
+                    className="font-mono"
+                  >
+                    {p.holderCount}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatPercent(p.avgWeightPct)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-x-2 gap-y-1">
+                    {p.holders.slice(0, 6).map((h) => (
+                      <Link
+                        key={h.id}
+                        href={`/superinvestors/${h.id}`}
+                        className="text-[11.5px] text-primary underline-offset-2 hover:underline"
+                      >
+                        {h.name.split(" ").slice(-1)[0]}
+                      </Link>
+                    ))}
+                    {p.holders.length > 6 ? (
+                      <span className="text-[11.5px] text-faint">
+                        +{p.holders.length - 6}
+                      </span>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </div>
   );

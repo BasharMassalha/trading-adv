@@ -135,4 +135,12 @@ export const portfolioService = {
     }
     await portfolioRepository.delete(portfolioId);
   },
+
+  async renameForUser(userId: string, portfolioId: string, name: string) {
+    const existing = await portfolioRepository.findById(portfolioId);
+    if (!existing || existing.userId !== userId) {
+      throw new NotFoundError("Portfolio not found.");
+    }
+    return portfolioRepository.update(portfolioId, { name });
+  },
 };

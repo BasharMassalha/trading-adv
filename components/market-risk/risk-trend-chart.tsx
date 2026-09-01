@@ -10,13 +10,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import type { RiskHistoryPoint } from "@/lib/market-risk/types";
 
 function formatShortDate(d: string): string {
@@ -49,14 +42,12 @@ function CustomTooltip({
   const data = payload[0]?.payload;
   if (!data) return null;
   return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md">
-      <div className="text-muted-foreground">
-        {label ? formatShortDate(label) : ""}
-      </div>
-      <div className="mt-0.5 font-medium tabular-nums">
-        Score {data.score}{" "}
-        <span className="font-normal text-muted-foreground">
-          · {data.regime}
+    <div className="rounded-[0.25rem] border bg-popover px-2.5 py-2 text-[12px] shadow-pop">
+      <div className="text-faint">{label ? formatShortDate(label) : ""}</div>
+      <div className="mt-0.5 font-mono font-medium">
+        {data.score}
+        <span className="ml-1.5 font-sans font-normal text-muted-foreground">
+          {data.regime}
         </span>
       </div>
     </div>
@@ -74,17 +65,20 @@ export function RiskTrendChart({ data }: { data: RiskHistoryPoint[] }) {
     .map((p) => p.date);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Risk score trend</CardTitle>
-        <CardDescription>
+    <div className="border bg-surface">
+      <div className="border-b px-5 py-3.5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight">
+          Risk score trend
+        </h2>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
           Aggregated 0–100 risk score over time. Reference lines mark the
           Normal / Elevated / High thresholds.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </div>
+
+      <div className="p-5">
         {!hasData ? (
-          <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-64 items-center justify-center border border-dashed bg-surface p-8 text-center text-[13px] text-muted-foreground">
             No history available yet.
           </div>
         ) : (
@@ -94,20 +88,6 @@ export function RiskTrendChart({ data }: { data: RiskHistoryPoint[] }) {
                 data={data}
                 margin={{ top: 10, right: 12, bottom: 0, left: 0 }}
               >
-                <defs>
-                  <linearGradient id="riskFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="0%"
-                      stopColor="hsl(20, 80%, 55%)"
-                      stopOpacity={0.45}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="hsl(20, 80%, 55%)"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   stroke="hsl(var(--border))"
@@ -115,56 +95,60 @@ export function RiskTrendChart({ data }: { data: RiskHistoryPoint[] }) {
                 />
                 <XAxis
                   dataKey="date"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--border))"
                   tickLine={false}
                   axisLine={false}
-                  fontSize={11}
+                  tick={{ fill: "hsl(var(--faint))", fontSize: 11 }}
                   ticks={ticks}
                   tickFormatter={formatShortDate}
                   minTickGap={20}
                 />
                 <YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--border))"
                   tickLine={false}
                   axisLine={false}
-                  fontSize={11}
+                  tick={{ fill: "hsl(var(--faint))", fontSize: 11 }}
                   domain={[0, 100]}
                   ticks={[0, 20, 40, 60, 80, 100]}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  content={<CustomTooltip />}
+                  cursor={{ stroke: "hsl(var(--border))" }}
+                />
 
                 <ReferenceLine
                   y={40}
-                  stroke="hsl(45, 80%, 50%)"
+                  stroke="hsl(var(--warning))"
                   strokeDasharray="4 4"
-                  strokeOpacity={0.6}
+                  strokeOpacity={0.55}
                 />
                 <ReferenceLine
                   y={60}
-                  stroke="hsl(25, 85%, 50%)"
+                  stroke="hsl(var(--destructive))"
                   strokeDasharray="4 4"
-                  strokeOpacity={0.6}
+                  strokeOpacity={0.45}
                 />
                 <ReferenceLine
                   y={80}
-                  stroke="hsl(0, 80%, 50%)"
+                  stroke="hsl(var(--destructive))"
                   strokeDasharray="4 4"
-                  strokeOpacity={0.6}
+                  strokeOpacity={0.7}
                 />
 
                 <Area
                   type="monotone"
                   dataKey="score"
-                  stroke="hsl(20, 80%, 55%)"
-                  strokeWidth={2}
-                  fill="url(#riskFill)"
+                  stroke="hsl(var(--foreground))"
+                  strokeWidth={1.6}
+                  fill="hsl(var(--foreground))"
+                  fillOpacity={0.06}
                   isAnimationActive
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

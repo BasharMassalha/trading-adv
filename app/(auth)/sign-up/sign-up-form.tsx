@@ -52,8 +52,10 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or email</span>
+            <div className="relative flex justify-center">
+              <span className="bg-surface px-2 text-[11px] uppercase tracking-wide text-faint">
+                Or email
+              </span>
             </div>
           </div>
         </div>
@@ -92,11 +94,14 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
         />
       </div>
       {error ? (
-        <p className="text-sm text-destructive" role="alert">
+        <p
+          className="border border-destructive/30 bg-destructive-soft px-3 py-2 text-[12.5px] text-destructive"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
-      <Button type="submit" className="w-full" disabled={loading}>
+      <Button type="submit" size="lg" className="w-full" disabled={loading}>
         {loading ? "Creating account..." : "Create account"}
       </Button>
     </form>

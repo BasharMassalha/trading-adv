@@ -1,261 +1,338 @@
+import Link from "next/link";
 import {
-  BarChart3,
-  Brain,
-  Globe,
-  LineChart,
-  Network,
-  Shield,
-  Sparkles,
-  SquareTerminal,
-  Target,
-  Upload,
+  Activity,
+  FileSearch,
+  FileText,
+  Gauge,
+  MessageSquare,
+  Users,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { clientEnv } from "@/lib/env";
-import { LandingChartShowcase } from "@/components/landing/landing-chart-showcase";
+import { BrandLockup } from "@/components/brand";
+import { LandingAnalysisFrame } from "@/components/landing/landing-analysis-frame";
 import { LandingSampleReport } from "@/components/landing/landing-sample-report";
-import { LandingHeroPreview } from "@/components/landing/landing-hero-preview";
 import {
   LandingHeaderNav,
   LandingHeroCtas,
   LandingBottomCtas,
 } from "@/components/landing/landing-nav-buttons";
 
-const ANALYSIS_STEPS: { title: string; desc: string }[] = [
+const SOURCES: { value: string; label: string }[] = [
   {
-    title: "We build your investor profile",
-    desc: "Onboarding captures your risk tolerance, time horizon, goals, and sector preferences. Every later step is scoped to you, not a generic template.",
+    value: "SEC EDGAR",
+    label: "10-K, 10-Q and 8-K filings, read at the source",
   },
   {
-    title: "We quantify your portfolio with rigour",
-    desc: "We normalise positions, enrich with market data, then compute weights, sector and asset mix, concentration, and performance-style metrics using consistent mathematical structure. You get numbers you can trace, not a black box.",
+    value: "13F",
+    label: "Quarterly institutional positions and options disclosures",
   },
   {
-    title: "We add news and public context",
-    desc: "For your holdings we pull in recent headlines and relevant company filings when your environment is configured for it, so the story next to your book matches what is moving in the market.",
+    value: "Live pricing",
+    label: "Quotes, 90-day history and sector classification",
   },
   {
-    title: "We run a deep analysis on top",
-    desc: "Our analysis layer combines your profile, the quantitative picture, and that news and filing context into a structured report. The same foundations power follow-up chat so you can stress-test ideas against the full stack.",
+    value: "Headline flow",
+    label: "News scored and attached to the position it moves",
   },
 ];
 
-const SERVICES: {
+const CAPABILITIES: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   body: string;
 }[] = [
   {
-    icon: Upload,
-    title: "Bring your portfolio in",
-    body: "CSV, screenshots, or manual input, rolled into one view of what you own so you can iterate from a real baseline.",
+    icon: FileSearch,
+    title: "A verdict for every position",
+    body: "Each line in your book gets a written case: accumulate, hold, or recycle, with the filing, the consensus, or the price series that produced it.",
   },
   {
-    icon: BarChart3,
-    title: "Track what matters",
-    body: "Values, P&L-style signals, and rank views so you see which lines actually move the needle when you want to improve.",
+    icon: Users,
+    title: "Institutional positioning",
+    body: "See which tracked superinvestors hold what you hold, where consensus is thinning, and when a fund hedges rather than exits.",
   },
   {
-    icon: Network,
-    title: "Balance risk and focus",
-    body: "See concentration and sector drift early. Exposure, not just a flat list, so rebalancing is a choice, not a guess.",
+    icon: FileText,
+    title: "Read from the filing, not the headline",
+    body: "Company language is pulled from EDGAR directly, so the argument in your report is the argument in the document.",
   },
   {
-    icon: Globe,
-    title: "Market context in one place",
-    body: "Quotes and context sit next to your book when your data path allows, so you reason with the market in view.",
+    icon: Gauge,
+    title: "Risk against your mandate",
+    body: "One score, measured against the comfort level you set during onboarding, not against a benchmark that has nothing to do with you.",
   },
   {
-    icon: Sparkles,
-    title: "AI for your next move",
-    body: "Talk through what-if and allocation changes in plain language, grounded in the portfolio you are building, not a generic script.",
+    icon: Activity,
+    title: "Regime, not just your book",
+    body: "Where the broad market sits on the risk curve today, which indicators are driving it, and the historical episode it most resembles.",
   },
   {
-    icon: Brain,
-    title: "Clear, repeatable structure",
-    body: "Analysis stays structured and comparable over time, so you can look back, adjust, and make calmer follow-on decisions.",
+    icon: MessageSquare,
+    title: "An advisor that shows its work",
+    body: "Ask follow-ups in plain language and stress-test alternatives. Every answer traces back to something you can open and check.",
   },
 ];
 
-const TRUST_PILLARS: { icon: React.ComponentType<{ className?: string }>; t: string }[] = [
-  { icon: Target, t: "Built to help you plan improvements, not just read a single score" },
-  { icon: Shield, t: "Sign-in and sessions handled like a product you can rely on" },
-  { icon: LineChart, t: "Charts you can return to and compare as your portfolio changes" },
+const LAYERS: { n: string; title: string; body: string }[] = [
+  {
+    n: "01",
+    title: "Your mandate",
+    body: "Risk tolerance, time horizon, objective, and the sectors you will and will not hold. Everything downstream is scored against this, not against a generic profile.",
+  },
+  {
+    n: "02",
+    title: "The position math",
+    body: "Positions normalised and enriched, then weights, sector and asset mix, concentration, and performance measured on a consistent basis you can trace.",
+  },
+  {
+    n: "03",
+    title: "The filing record",
+    body: "Recent 10-K, 10-Q and 8-K disclosures for the tickers you actually hold, so the fundamental picture comes from the company, not from commentary.",
+  },
+  {
+    n: "04",
+    title: "Institutional positioning",
+    body: "13F holdings across tracked superinvestors: who is accumulating, who has thinned out, and who is carrying disclosed protective positions.",
+  },
+  {
+    n: "05",
+    title: "Market context",
+    body: "The current risk regime, the indicators moving it, and the headline flow attached to each holding, so a single-name call is made in context.",
+  },
+  {
+    n: "06",
+    title: "The written case",
+    body: "All five layers resolved into a structured report and a conviction score per position, and the same foundation answers your follow-up questions.",
+  },
+];
+
+const STEPS: { title: string; body: string }[] = [
+  {
+    title: "Set the mandate",
+    body: "A short onboarding captures risk tolerance, horizon, objective, and sector preferences. Two minutes, once.",
+  },
+  {
+    title: "Bring the book in",
+    body: "Upload a brokerage export or a screenshot of your positions. They are read, normalised, and priced automatically.",
+  },
+  {
+    title: "Read the case",
+    body: "Structured analysis per position, cited to source. Every suggestion is a starting point; nothing executes without you.",
+  },
 ];
 
 export default function LandingPage() {
   const name = clientEnv.NEXT_PUBLIC_APP_NAME;
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      {/* Soft ambient layers */}
-      <div className="pointer-events-none absolute inset-0 grid-bg opacity-50" />
-      <div className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-primary/20 blur-3xl landing-blob-pulse" />
-      <div
-        className="pointer-events-none absolute -right-24 top-1/3 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl landing-blob-pulse"
-        style={{ animationDelay: "2s" }}
-      />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-gradient-to-b from-primary/12 via-primary/[0.04] to-transparent" />
-
-      <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/30">
-            <SquareTerminal className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-base font-semibold tracking-tight">{name}</span>
-            <span className="text-[11px] font-medium text-muted-foreground">
-              AI for building better portfolios
-            </span>
-          </div>
+    <main className="min-h-screen bg-background">
+      {/* ── Nav ─────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex h-[60px] max-w-[1160px] items-center justify-between px-6 md:px-10">
+          <BrandLockup size="md" />
+          <nav className="hidden items-center gap-7 text-[13.5px] text-muted-foreground md:flex">
+            <a href="#capabilities" className="hover:text-foreground">
+              Product
+            </a>
+            <a href="#method" className="hover:text-foreground">
+              Method
+            </a>
+            <a href="#report" className="hover:text-foreground">
+              Sample report
+            </a>
+            <a href="#sources" className="hover:text-foreground">
+              Data
+            </a>
+          </nav>
+          <LandingHeaderNav />
         </div>
-        <LandingHeaderNav />
       </header>
 
-      {/* Hero: copy + live-style preview */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 pb-6 pt-2 md:pb-10 md:pt-4">
-        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12 lg:pt-2">
-          <div className="text-center lg:text-left">
-            <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-gradient-to-r from-card/80 to-card/40 px-3.5 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur lg:mx-0">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-              Build, refine, and decide with a clearer line of sight
-            </div>
-            <h1 className="text-balance text-4xl font-semibold leading-[1.1] tracking-tight md:text-5xl lg:text-6xl">
-              An AI that helps you build, improve, and make better decisions about your portfolio.
+      {/* ── Hero ────────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-[1160px] px-6 pb-16 pt-14 md:px-10 md:pb-16 md:pt-[76px]">
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-[60px]">
+          <div>
+            <h1 className="max-w-[540px] text-[34px] font-semibold leading-[1.12] tracking-tight md:text-[42px]">
+              Every holding, cross-examined against the record.
             </h1>
-            <p className="mt-5 max-w-xl text-pretty text-base text-muted-foreground/95 md:text-lg lg:mx-0">
-              {name} turns your actual holdings into structured views, context, and conversation so you
-              can strengthen allocation, test ideas, and choose next steps with more confidence, not
-              more noise. You stay in control; the AI does the heavy lifting to clarify trade-offs and
-              highlight what might change the outcome.
+            <p className="mt-5 max-w-[470px] text-[16px] leading-relaxed text-muted-foreground">
+              {name} builds a written case for each position you own: SEC
+              filings, 13F institutional consensus, analyst dispersion, and live
+              pricing, cross-referenced automatically and cited line by line.
+              Not a balance you check. A case you can defend.
             </p>
-            <div className="mt-2 lg:text-left">
+            <div className="mt-8">
               <LandingHeroCtas />
             </div>
-          </div>
-          <div className="flex justify-center lg:justify-end">
-            <LandingHeroPreview />
-          </div>
-        </div>
-      </section>
-
-      {/* Visual showcase */}
-      <section className="relative z-10 border-y border-border/50 bg-gradient-to-b from-muted/20 via-card/15 to-background py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="text-center">
-            <p className="text-sm font-medium uppercase tracking-widest text-primary">At a glance</p>
-            <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight md:text-3xl">
-              See the moves that strengthen your book
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-              Sample visuals below, with calm colour and light motion. The same look and feel
-              supports you after you sign in when you are ready to build and improve for real.
+            <p className="mt-7 text-[12.5px] text-faint">
+              No credit card required. Works with any brokerage export.
             </p>
           </div>
-          <LandingChartShowcase />
+
+          <LandingAnalysisFrame />
         </div>
       </section>
 
-      <LandingSampleReport />
-
-      <section className="relative z-10 py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="text-center">
-            <p className="text-sm font-medium uppercase tracking-widest text-primary">Analysis</p>
-            <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight md:text-3xl">
-              The process behind every report
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-              We start by building your investor profile, then layer a deep analysis on your actual
-              imports: mathematical treatment of weights, allocations, and performance-style
-              metrics, plus recent news and filings for your tickers when those services are
-              available. That full picture feeds a structured report and AI follow-up, so what you read
-              always maps back to profile, math, and market context.
-            </p>
-          </div>
-          <ol className="landing-stagger mt-12 grid gap-4 md:grid-cols-2">
-            {ANALYSIS_STEPS.map((step, i) => (
-              <li key={step.title}>
-                <Card className="h-full border-border/60 bg-gradient-to-br from-card/70 to-card/30 text-left shadow-sm backdrop-blur">
-                  <CardContent className="p-6">
-                    <div className="flex gap-4">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-sm font-bold text-primary ring-1 ring-primary/20">
-                        {i + 1}
-                      </span>
-                      <div>
-                        <h3 className="font-medium">{step.title}</h3>
-                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                          {step.desc}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-20">
-        <div className="text-center">
-          <p className="text-sm font-medium uppercase tracking-widest text-primary">Services</p>
-          <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight md:text-3xl">
-            One workspace to build, review, and improve
-          </h2>
-        </div>
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SERVICES.map(({ icon: Icon, title, body }) => (
-            <Card
-              key={title}
-              className="group border-border/70 bg-gradient-to-b from-card/60 to-card/25 text-left shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-primary/5"
+      {/* ── Source strip ────────────────────────────────────────────── */}
+      <section id="sources" className="border-y bg-surface py-7">
+        <div className="mx-auto grid max-w-[1160px] gap-6 px-6 md:px-10 lg:grid-cols-4">
+          {SOURCES.map((s, i) => (
+            <div
+              key={s.value}
+              className={
+                i === 0 ? "" : "lg:border-l lg:border-border lg:pl-5"
+              }
             >
-              <CardContent className="p-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/10 transition-transform duration-300 group-hover:scale-105">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="mt-4 font-medium">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-              </CardContent>
-            </Card>
+              <div className="font-mono text-[19px] font-semibold tracking-tight">
+                {s.value}
+              </div>
+              <div className="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                {s.label}
+              </div>
+            </div>
           ))}
         </div>
       </section>
 
-      <section className="relative z-10 border-t border-border/60 bg-gradient-to-b from-muted/20 to-background py-16">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="grid gap-8 rounded-2xl border border-border/50 bg-card/20 p-6 backdrop-blur-sm md:grid-cols-3 md:gap-6 md:p-8">
-            {TRUST_PILLARS.map(({ icon: Icon, t }) => (
-              <div
-                key={t}
-                className="flex items-start gap-3 md:flex-col md:items-center md:text-center"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
-                  <Icon className="h-4 w-4" />
-                </div>
-                <p className="text-sm leading-snug text-muted-foreground md:pt-0">{t}</p>
+      {/* ── Capabilities ────────────────────────────────────────────── */}
+      <section id="capabilities" className="py-16 md:py-[70px]">
+        <div className="mx-auto max-w-[1160px] px-6 md:px-10">
+          <div className="max-w-[600px]">
+            <h2 className="text-[27px] font-semibold leading-tight tracking-tight">
+              A tracker tells you what you own. This tells you whether you
+              should hold it.
+            </h2>
+            <p className="mt-3 text-[14.5px] leading-relaxed text-muted-foreground">
+              Every number on the screen traces back to a document you can open:
+              a 10-K, a 13F, a price series. Nothing is asserted without a
+              source, and nothing is hidden behind a score.
+            </p>
+          </div>
+
+          <div className="hairline-grid mt-10 grid md:grid-cols-2 lg:grid-cols-3">
+            {CAPABILITIES.map(({ icon: Icon, title, body }) => (
+              <div key={title} className="p-6">
+                <Icon className="h-5 w-5 stroke-[1.6] text-primary" />
+                <h3 className="mt-4 text-[15px] font-semibold">{title}</h3>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+                  {body}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-6xl px-6 py-20 text-center">
-        <h2 className="text-balance text-2xl font-semibold tracking-tight md:text-3xl">
-          Ready to build a sharper portfolio?
-        </h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-          Create an account to save portfolios and sync your profile, or explore the demo dashboard
-          first to see how {name} helps you think through your next move.
-        </p>
-        <LandingBottomCtas appName={name} />
+      {/* ── Method / evidence stack ─────────────────────────────────── */}
+      <section id="method" className="border-y bg-surface py-16 md:py-[70px]">
+        <div className="mx-auto max-w-[1160px] px-6 md:px-10">
+          <div className="grid gap-12 lg:grid-cols-[340px_1fr] lg:gap-16">
+            <div className="lg:sticky lg:top-24 lg:self-start">
+              <div className="font-mono text-[11px] uppercase tracking-wider text-faint">
+                Method
+              </div>
+              <h2 className="mt-3 text-[27px] font-semibold leading-tight tracking-tight">
+                Six layers behind a single verdict.
+              </h2>
+              <p className="mt-3 text-[14.5px] leading-relaxed text-muted-foreground">
+                A one-line recommendation is easy to produce and impossible to
+                trust. Each report is assembled in order, and every layer is
+                visible in the output.
+              </p>
+            </div>
+
+            <ol className="border-t">
+              {LAYERS.map((l) => (
+                <li
+                  key={l.n}
+                  className="grid gap-4 border-b py-6 sm:grid-cols-[56px_1fr]"
+                >
+                  <div className="font-mono text-[13px] text-faint">{l.n}</div>
+                  <div>
+                    <h3 className="text-[15px] font-semibold">{l.title}</h3>
+                    <p className="mt-2 max-w-[620px] text-[13.5px] leading-relaxed text-muted-foreground">
+                      {l.body}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
       </section>
 
-      <footer className="relative z-10 border-t border-border/60 py-8 text-center text-xs text-muted-foreground">
-        <p>
-          © {new Date().getFullYear()} {name}. AI that helps you build, improve, and choose with
-          clarity.
-        </p>
+      {/* ── Sample report ───────────────────────────────────────────── */}
+      <div id="report">
+        <LandingSampleReport />
+      </div>
+
+      {/* ── Steps ───────────────────────────────────────────────────── */}
+      <section className="py-16 md:py-[70px]">
+        <div className="mx-auto max-w-[1160px] px-6 md:px-10">
+          <div className="max-w-[560px]">
+            <h2 className="text-[27px] font-semibold leading-tight tracking-tight">
+              Three steps to a real analysis.
+            </h2>
+            <p className="mt-3 text-[14.5px] leading-relaxed text-muted-foreground">
+              No manual data entry, and no waiting on someone else&rsquo;s
+              quarterly note.
+            </p>
+          </div>
+
+          <div className="landing-stagger mt-10 grid gap-7 md:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <div key={s.title} className="relative pl-11">
+                <span className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full border border-border-strong font-mono text-[12px] text-muted-foreground">
+                  {i + 1}
+                </span>
+                <h3 className="text-[14.5px] font-semibold">{s.title}</h3>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
+                  {s.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ─────────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-[1160px] px-6 pb-4 md:px-10">
+        <div className="flex flex-col gap-8 rounded-[14px] bg-foreground px-8 py-11 sm:flex-row sm:items-center sm:justify-between md:px-14">
+          <div>
+            <h2 className="text-[24px] font-semibold leading-tight tracking-tight text-background">
+              Start reading your portfolio like an analyst.
+            </h2>
+            <p className="mt-2 text-[13.5px] text-faint">
+              Free to start. Bring one brokerage export and see the difference
+              on your own positions.
+            </p>
+          </div>
+          <LandingBottomCtas appName={name} />
+        </div>
+      </section>
+
+      {/* ── Footer ──────────────────────────────────────────────────── */}
+      <footer className="mt-14 border-t py-8">
+        <div className="mx-auto flex max-w-[1160px] flex-col gap-5 px-6 md:flex-row md:items-center md:justify-between md:px-10">
+          <BrandLockup size="sm" />
+          <nav className="flex flex-wrap gap-6 text-[12.5px] text-muted-foreground">
+            <a href="#capabilities" className="hover:text-foreground">
+              Product
+            </a>
+            <a href="#method" className="hover:text-foreground">
+              Method
+            </a>
+            <a href="#sources" className="hover:text-foreground">
+              Data
+            </a>
+            <Link href="/sign-in" className="hover:text-foreground">
+              Sign in
+            </Link>
+          </nav>
+          <p className="text-[11.5px] text-faint">
+            © {new Date().getFullYear()} {name}. Not financial advice.
+          </p>
+        </div>
       </footer>
     </main>
   );

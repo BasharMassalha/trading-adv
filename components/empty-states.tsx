@@ -10,119 +10,107 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/page-header";
 import { clientEnv } from "@/lib/env";
 
 export function EmptyDashboard() {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
-      <Card className="w-full max-w-lg border-dashed">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <TrendingUp className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">
-            Welcome to {clientEnv.NEXT_PUBLIC_APP_NAME}
-          </CardTitle>
-          <CardDescription className="text-base">
-            Upload your portfolio to get personalized AI-powered insights,
-            analysis, and recommendations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 text-sm">
-            <div className="flex items-start gap-3 rounded-lg border p-3">
-              <PieChart className="mt-0.5 h-5 w-5 text-muted-foreground" />
-              <div>
-                <div className="font-medium">Portfolio Analysis</div>
-                <div className="text-muted-foreground">
-                  See your holdings, allocation, and performance metrics
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-lg border p-3">
-              <Sparkles className="mt-0.5 h-5 w-5 text-muted-foreground" />
-              <div>
-                <div className="font-medium">AI Insights</div>
-                <div className="text-muted-foreground">
-                  Get personalized recommendations based on your goals
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={`Welcome to ${clientEnv.NEXT_PUBLIC_APP_NAME}`}
+        description="Import your holdings to get valuation, allocation, risk scoring, and AI-powered analysis."
+      />
 
-          <Button asChild className="w-full gap-2">
-            <Link href="/portfolio/upload">
-              <Upload className="h-4 w-4" />
-              Upload Your Portfolio
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="border border-dashed bg-surface p-8 text-center">
+        <TrendingUp className="mx-auto h-5 w-5 text-faint" />
+        <p className="mt-3 text-[13px] font-medium">No portfolio loaded yet</p>
+        <p className="mx-auto mt-1 max-w-md text-[12.5px] leading-relaxed text-muted-foreground">
+          Upload a broker CSV export or a screenshot of your holdings. Parsing
+          takes a few seconds, and you review every row before anything is
+          saved.
+        </p>
+        <Button asChild className="mt-4">
+          <Link href="/portfolio/upload">
+            <Upload className="h-3.5 w-3.5" />
+            Upload your portfolio
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </div>
+
+      <div className="hairline-grid grid md:grid-cols-2">
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <PieChart className="h-3.5 w-3.5 shrink-0 text-faint" />
+            <h2 className="text-[13.5px] font-semibold tracking-tight">
+              Portfolio analysis
+            </h2>
+          </div>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+            See your holdings, sector allocation, and performance metrics
+            against a benchmark.
+          </p>
+        </div>
+
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-faint" />
+            <h2 className="text-[13.5px] font-semibold tracking-tight">
+              AI insights
+            </h2>
+          </div>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-muted-foreground">
+            Get recommendations weighted to the goals and risk tolerance on your
+            profile.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
 export function EmptyPortfolioList() {
   return (
-    <Card className="border-dashed">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-          <Briefcase className="h-7 w-7 text-muted-foreground" />
-        </div>
-        <CardTitle>No portfolios yet</CardTitle>
-        <CardDescription>
-          Import your first portfolio to start tracking your investments and get
-          AI-powered analysis.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex justify-center pb-6">
-        <Button asChild className="gap-2">
-          <Link href="/portfolio/upload">
-            <Upload className="h-4 w-4" />
-            Import Portfolio
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="border border-dashed bg-surface p-8 text-center">
+      <Briefcase className="mx-auto h-5 w-5 text-faint" />
+      <p className="mt-3 text-[13px] font-medium">No portfolios yet</p>
+      <p className="mx-auto mt-1 max-w-md text-[12.5px] leading-relaxed text-muted-foreground">
+        Import your first portfolio to start tracking your investments and get
+        AI-powered analysis.
+      </p>
+      <Button asChild className="mt-4">
+        <Link href="/portfolio/upload">
+          <Upload className="h-3.5 w-3.5" />
+          Import portfolio
+        </Link>
+      </Button>
+    </div>
   );
 }
 
 export function EmptyPortfolioDetail() {
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center px-4">
-      <Card className="w-full max-w-md border-dashed">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-            <Briefcase className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <CardTitle>Portfolio not found</CardTitle>
-          <CardDescription>
-            This portfolio doesn't exist or you don't have access to it.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2 pb-6">
-          <Button asChild variant="default" className="gap-2">
-            <Link href="/portfolio">
-              <ArrowRight className="h-4 w-4" />
-              View Your Portfolios
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="gap-2">
-            <Link href="/portfolio/upload">
-              <Upload className="h-4 w-4" />
-              Import New Portfolio
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+    <div className="mx-auto max-w-md border border-dashed bg-surface p-8 text-center">
+      <Briefcase className="mx-auto h-5 w-5 text-faint" />
+      <p className="mt-3 text-[13px] font-medium">Portfolio not found</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+        This portfolio doesn&rsquo;t exist, or you don&rsquo;t have access to
+        it.
+      </p>
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <Button asChild>
+          <Link href="/portfolio">
+            <ArrowRight className="h-3.5 w-3.5" />
+            View your portfolios
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/portfolio/upload">
+            <Upload className="h-3.5 w-3.5" />
+            Import new portfolio
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }

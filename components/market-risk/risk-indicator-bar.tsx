@@ -1,8 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { REGIME_ORDER, scoreToHsl } from "./risk-style-utils";
+import { REGIME_ORDER } from "./risk-style-utils";
 import type { RiskRegime } from "@/lib/market-risk/types";
 
 type Props = { score: number; regime: RiskRegime };
@@ -15,84 +14,82 @@ const BAND_RANGES: { label: RiskRegime; start: number; end: number }[] = [
   { label: "Extreme", start: 80, end: 100 },
 ];
 
+/**
+ * The 0–100 scale is a genuine risk ramp, so the colour sweep here is data
+ * encoding rather than decoration. It is built from the semantic tokens.
+ */
+const RISK_RAMP =
+  "linear-gradient(to right, hsl(var(--success)) 0%, hsl(var(--success)) 22%, hsl(var(--warning)) 50%, hsl(var(--destructive)) 78%, hsl(var(--destructive)) 100%)";
+
 export function RiskIndicatorBar({ score, regime }: Props) {
   const pct = Math.max(0, Math.min(100, score));
-  const accent = scoreToHsl(pct);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Risk indicator</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* ── Color band ─────────────────────────────────────── */}
-          <div className="relative h-6 w-full overflow-hidden rounded-full border bg-muted">
+    <div className="flex h-full flex-col border bg-surface">
+      <div className="border-b px-5 py-3">
+        <h2 className="text-[13.5px] font-semibold tracking-tight">
+          Risk indicator
+        </h2>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        {/* ── Colour band ────────────────────────────────────────── */}
+        <div className="relative h-5 w-full border bg-muted">
+          <div className="absolute inset-0" style={{ background: RISK_RAMP }} />
+
+          {/* Band dividers */}
+          {BAND_RANGES.slice(1).map((b) => (
             <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(to right, hsl(150,75%,45%) 0%, hsl(105,75%,45%) 25%, hsl(45,80%,50%) 50%, hsl(25,85%,50%) 75%, hsl(0,80%,50%) 100%)",
-                opacity: 0.85,
-              }}
+              key={b.label}
+              className="absolute top-0 h-full w-px bg-surface/70"
+              style={{ left: `${b.start}%` }}
             />
-            {/* Band dividers */}
-            {BAND_RANGES.slice(1).map((b) => (
-              <div
-                key={b.label}
-                className="absolute top-0 h-full w-px bg-background/60"
-                style={{ left: `${b.start}%` }}
-              />
-            ))}
-            {/* Pointer */}
+          ))}
+
+          {/* Pointer */}
+          <div
+            className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${pct}%` }}
+          >
             <div
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${pct}%` }}
-            >
-              <div
-                className="h-7 w-3 rounded-sm border-2 border-background shadow-md"
-                style={{ background: accent }}
-                aria-label={`Risk score ${pct}`}
-              />
-            </div>
-          </div>
-
-          {/* ── Band labels ────────────────────────────────────── */}
-          <div className="grid grid-cols-5 gap-1 text-center text-[11px] font-medium">
-            {REGIME_ORDER.map((label) => {
-              const active = label === regime;
-              return (
-                <div
-                  key={label}
-                  className={cn(
-                    "rounded-md border px-2 py-1 transition-colors",
-                    active
-                      ? "border-foreground/40 bg-foreground/5 text-foreground"
-                      : "border-transparent text-muted-foreground",
-                  )}
-                >
-                  {label}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
-            <span>
-              Score{" "}
-              <span className="font-medium text-foreground tabular-nums">
-                {pct}
-              </span>{" "}
-              / 100 — currently in the{" "}
-              <span className="font-medium text-foreground">{regime}</span>{" "}
-              band.
-            </span>
-            <span className="italic">
-              Risk indicator — not a forecast.
-            </span>
+              className="h-7 w-[3px] bg-foreground ring-1 ring-surface"
+              role="img"
+              aria-label={`Risk score ${pct} of 100`}
+            />
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* ── Band labels ────────────────────────────────────────── */}
+        <div className="grid grid-cols-5 gap-1 text-center text-[11px]">
+          {REGIME_ORDER.map((label) => {
+            const active = label === regime;
+            return (
+              <div
+                key={label}
+                className={cn(
+                  "border px-1.5 py-1 transition-colors",
+                  active
+                    ? "border-border-strong bg-background font-medium text-foreground"
+                    : "border-transparent text-faint",
+                )}
+              >
+                {label}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-auto space-y-1 pt-1 text-[12px] text-muted-foreground">
+          <p>
+            Score <span className="font-mono text-foreground">{pct}</span> / 100,
+            currently in the{" "}
+            <span className="font-medium text-foreground">{regime}</span> band.
+          </p>
+          <p className="text-[11px] text-faint">
+            Risk indicator, not a forecast.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

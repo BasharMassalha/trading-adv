@@ -18,16 +18,18 @@ export default function SignInPage() {
   const googleEnabled = isGoogleOAuthConfigured();
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to continue to your portfolio.</CardDescription>
+    <Card className="p-1">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-[22px]">Welcome back</CardTitle>
+        <CardDescription>
+          Sign in to pick up where your analysis left off.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Suspense fallback={null}>
           <SignInForm googleEnabled={googleEnabled} />
         </Suspense>
-        <p className="mt-6 text-center text-sm text-muted-foreground">
+        <p className="mt-6 text-[13px] text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
             href="/sign-up"

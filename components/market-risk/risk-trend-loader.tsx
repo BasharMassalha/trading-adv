@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RiskTrendChart } from "./risk-trend-chart";
 import type { RiskHistoryPoint } from "@/lib/market-risk/types";
@@ -46,25 +45,23 @@ export function RiskTrendLoader({ days = 180 }: { days?: number }) {
 
   if (state.kind === "loading") {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-40" />
+      <div className="border bg-surface">
+        <div className="border-b px-5 py-3.5">
+          <Skeleton className="h-4 w-40" />
           <Skeleton className="mt-2 h-3 w-72" />
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div className="p-5">
           <Skeleton className="h-72 w-full" />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   if (state.kind === "error") {
     return (
-      <Card>
-        <CardContent className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-          Couldn&apos;t load risk score history: {state.message}
-        </CardContent>
-      </Card>
+      <div className="flex h-64 items-center justify-center border border-dashed bg-surface p-8 text-center text-[13px] text-muted-foreground">
+        Couldn&apos;t load risk score history: {state.message}
+      </div>
     );
   }
 

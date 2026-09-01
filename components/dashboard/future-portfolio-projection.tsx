@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Calculator, Heart, Sparkles, TrendingUp, X } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
-import { RETURN_PRESETS, buildProjection, type HorizonProjection } from "@/lib/projections/growth";
+import {
+  RETURN_PRESETS,
+  buildProjection,
+  type HorizonProjection,
+} from "@/lib/projections/growth";
 import type { ProjectionReturnAssumption } from "@/lib/projections/assumptions";
 import { buildLifeImpactBlock } from "@/lib/projections/life-impact";
 
@@ -34,20 +30,20 @@ function ProjectionColumn({
   base: number;
 }) {
   return (
-    <div className="rounded-xl border bg-card/50 p-4 backdrop-blur">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="bg-surface p-4">
+      <div className="text-[11px] uppercase tracking-wide text-faint">
         {title}
       </div>
-      <div className="mt-1 font-mono text-xl font-bold tracking-tight sm:text-2xl">
+      <div className="mt-1.5 font-mono text-[20px] font-semibold tracking-tight">
         {formatCurrency(proj.endValue)}
       </div>
-      <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+      <div className="mt-3 space-y-1.5 border-t pt-3 text-[12px]">
         <div className="flex justify-between gap-2">
-          <span>Gain from today</span>
+          <span className="text-muted-foreground">Gain from today</span>
           <span
             className={cn(
-              "font-medium text-foreground",
-              proj.profitFromToday >= 0 ? "text-emerald-600 dark:text-emerald-400" : "",
+              "font-mono",
+              proj.profitFromToday >= 0 ? "text-success" : "text-destructive",
             )}
           >
             {proj.profitFromToday >= 0 ? "+" : ""}
@@ -55,13 +51,13 @@ function ProjectionColumn({
           </span>
         </div>
         <div className="flex justify-between gap-2">
-          <span>Total return</span>
-          <span className="font-mono text-foreground">
+          <span className="text-muted-foreground">Total return</span>
+          <span className="font-mono">
             {formatPercent(proj.totalReturnPct, 1)}
           </span>
         </div>
-        <div className="flex justify-between gap-2 text-xs">
-          <span>vs. starting</span>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Multiple</span>
           <span className="font-mono">
             {base > 0 ? `${(proj.endValue / base).toFixed(2)}×` : "—"}
           </span>
@@ -115,49 +111,37 @@ export function FuturePortfolioProjection({
 
   if (portfolioValue == null || portfolioValue <= 0) {
     return (
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Calculator className="h-4 w-4" />
-            Future value outlook
-          </CardTitle>
-          <CardDescription>
-            Add a portfolio with a positive value to open the projection tool.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="border border-dashed bg-surface p-5">
+        <h3 className="text-[13.5px] font-semibold">Future value outlook</h3>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          Add a portfolio with a positive value to open the projection tool.
+        </p>
+      </div>
     );
   }
 
   return (
     <>
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.05] via-transparent to-violet-500/[0.04]">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 pb-2">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Future value outlook
-            </CardTitle>
-            <CardDescription className="max-w-xl">
-              Hypothetical 5 / 10 / 20 year paths from today, using your profile and
-              analysis-backed assumptions. Not a forecast or advice.
-              {isDemo ? " Demo portfolio." : ""}
-            </CardDescription>
-          </div>
-          <Button type="button" onClick={() => setOpen(true)} className="shrink-0 gap-2">
-            <Calculator className="h-4 w-4" />
-            Open projection
-          </Button>
-        </CardHeader>
-        <CardContent className="pb-4 pt-0">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="secondary" className="font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-4 border bg-surface px-5 py-4">
+        <div className="min-w-0">
+          <h3 className="text-[13.5px] font-semibold">Future value outlook</h3>
+          <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-muted-foreground">
+            Hypothetical 5, 10, and 20 year paths from today, compounded at an
+            assumption drawn from your profile and latest analysis. A planning
+            sketch, not a forecast.
+            {isDemo ? " Sample portfolio." : ""}
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11.5px] text-faint">
+            <span className="rounded-md border bg-background px-2 py-0.5 font-mono">
               ~{analysisPct}% / yr baseline
-            </Badge>
-            <span>Based on your settings{isDemo ? "" : " and latest analysis when available"}.</span>
+            </span>
+            <span>No contributions, taxes, or fees modelled.</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <Button type="button" onClick={() => setOpen(true)} className="shrink-0">
+          Open projection
+        </Button>
+      </div>
 
       {open && (
         <div
@@ -169,26 +153,21 @@ export function FuturePortfolioProjection({
           <button
             type="button"
             aria-label="Close"
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-foreground/40"
             onClick={() => setOpen(false)}
           />
-          <div
-            className={cn(
-              "relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border bg-card shadow-2xl sm:rounded-2xl",
-            )}
-          >
+          <div className="relative z-10 flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden border bg-surface shadow-pop">
             <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
               <div>
                 <h2
                   id="projection-dialog-title"
-                  className="flex items-center gap-2 text-lg font-semibold"
+                  className="text-[15px] font-semibold"
                 >
-                  <Calculator className="h-5 w-5 text-primary" />
                   Where this portfolio could go
                 </h2>
-                <Badge variant="outline" className="mt-2 font-mono text-xs">
+                <p className="mt-1 font-mono text-[11.5px] text-faint">
                   Today: {formatCurrency(portfolioValue)}
-                </Badge>
+                </p>
               </div>
               <Button
                 type="button"
@@ -196,29 +175,32 @@ export function FuturePortfolioProjection({
                 size="icon"
                 className="shrink-0"
                 onClick={() => setOpen(false)}
+                aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="overflow-y-auto px-5 py-4">
-              <div className="rounded-xl border bg-muted/30 p-4 text-sm leading-relaxed text-foreground/90">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Our assumption
+            <div className="overflow-y-auto px-5 py-5">
+              <div className="border bg-background p-4">
+                <p className="text-[11px] uppercase tracking-wide text-faint">
+                  The assumption
                 </p>
-                <p className="mt-2">{assumption.rationale}</p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Showing compound growth at{" "}
+                <p className="mt-2 text-[13px] leading-relaxed">
+                  {assumption.rationale}
+                </p>
+                <p className="mt-3 text-[11.5px] text-muted-foreground">
+                  Compounding at{" "}
                   <span className="font-mono font-semibold text-foreground">
                     {displayPct}% per year
                   </span>{" "}
-                  (nominal), no contributions or withdrawals, taxes, or fees.
+                  nominal, with no contributions, withdrawals, taxes, or fees.
                 </p>
               </div>
 
-              <div className="mt-4 flex flex-col gap-3 rounded-xl border p-4">
+              <div className="mt-4 flex flex-col gap-3 border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-medium">Annual return</span>
+                  <span className="text-[13px] font-medium">Annual return</span>
                   {!adjustRate ? (
                     <Button
                       type="button"
@@ -232,19 +214,17 @@ export function FuturePortfolioProjection({
                       Adjust the rate yourself
                     </Button>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setAdjustRate(false);
-                          setManualPct(analysisPct);
-                        }}
-                      >
-                        Use analysis default ({analysisPct}%)
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setAdjustRate(false);
+                        setManualPct(analysisPct);
+                      }}
+                    >
+                      Use analysis default ({analysisPct}%)
+                    </Button>
                   )}
                 </div>
 
@@ -257,15 +237,14 @@ export function FuturePortfolioProjection({
                           type="button"
                           size="sm"
                           variant={manualPct === p.pct ? "default" : "outline"}
-                          className="rounded-full"
                           onClick={() => setManualPct(p.pct)}
                         >
                           {p.label} ~{p.pct}%
                         </Button>
                       ))}
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-medium text-muted-foreground">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-mono text-[11.5px] text-muted-foreground">
                         Custom: {manualPct}%
                       </label>
                       <input
@@ -284,7 +263,7 @@ export function FuturePortfolioProjection({
 
               {projection && (
                 <>
-                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <div className="hairline-grid mt-4 grid sm:grid-cols-3">
                     <ProjectionColumn
                       title="~5 years"
                       proj={projection.year5}
@@ -302,32 +281,29 @@ export function FuturePortfolioProjection({
                     />
                   </div>
 
-                  <p className="mt-4 text-center text-[11px] text-muted-foreground">
-                    Value × (1 + r)^n. Real life includes volatility, cash flows, and costs
-                    — use this as a planning sketch only.
+                  <p className="mt-3 text-[11px] text-faint">
+                    Value × (1 + r)ⁿ. Real outcomes include volatility, cash
+                    flows, and costs.
                   </p>
 
                   {lifeBlock && (
-                    <div className="mt-6 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
-                      <div className="mb-3 flex flex-col gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <Heart className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                          <h3 className="text-sm font-semibold tracking-tight">
-                            How your life could feel if this happened
-                          </h3>
-                        </div>
-                        <p className="pl-6 text-xs text-muted-foreground">{lifeBlock.headline}</p>
-                      </div>
-                      <p className="text-sm leading-relaxed text-foreground/90">
+                    <div className="mt-5 border bg-background p-5">
+                      <h3 className="text-[13.5px] font-semibold tracking-tight">
+                        What that would mean in practice
+                      </h3>
+                      <p className="mt-0.5 text-[11.5px] text-faint">
+                        {lifeBlock.headline}
+                      </p>
+                      <p className="mt-3 text-[13px] leading-relaxed">
                         {lifeBlock.intro}
                       </p>
-                      <ul className="mt-4 space-y-3">
+                      <ul className="mt-4 space-y-2.5">
                         {lifeBlock.bullets.map((b, i) => (
                           <li
                             key={i}
-                            className="flex gap-3 text-sm leading-relaxed text-muted-foreground"
+                            className="flex gap-2.5 text-[12.5px] leading-relaxed text-muted-foreground"
                           >
-                            <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                            <span className="mt-[7px] h-1 w-1 shrink-0 bg-faint" />
                             <span>{b}</span>
                           </li>
                         ))}
@@ -337,8 +313,12 @@ export function FuturePortfolioProjection({
                 </>
               )}
 
-              <div className="mt-6 flex justify-end">
-                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              <div className="mt-5 flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                >
                   Close
                 </Button>
               </div>

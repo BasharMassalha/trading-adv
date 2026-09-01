@@ -1,292 +1,254 @@
 import Link from "next/link";
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  FileText,
-  Shield,
-  Sparkles,
-  Target,
-  TrendingUp,
-  Zap,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-/** Static sample — mirrors a real AI report for marketing. */
+/** Static sample — mirrors the shape of a real generated report. */
 const SAMPLE = {
-  portfolioLabel: "$482K tech-heavy portfolio · Moderate risk profile",
-  generatedAt: "Sample report",
+  portfolioLabel: "$482K book · Moderate mandate · 14 positions",
   summary:
-    "Your portfolio is up 18.4% overall but carries meaningful concentration risk. NVDA and MSFT together represent 41% of total value — well above a typical moderate-risk target. Technology sector exposure sits at 62%, creating correlated downside if growth multiples compress. Cash flow quality across top holdings remains strong, but rebalancing 8–12% from winners into broad-market and defensive exposure would better align with your stated 5/10 comfort level.",
+    "The book is up 18.4%, but the return is carried by two names. NVDA and MSFT together account for 41% of value, well above the ceiling implied by a moderate mandate, and technology sits at 62% of exposure, so a multiple compression event hits nearly two thirds of the portfolio at once. Balance-sheet quality across the top five is strong and the average hold period is over two years, which argues against wholesale selling. Recycling 8–12% out of the winners into broad-market and defensive exposure brings measured risk back inside the 5.5 comfort level without abandoning the thesis.",
   riskScore: { portfolio: 7.2, comfort: 5.5, label: "Elevated" },
   strengths: [
-    "Strong unrealised gains in core AI beneficiaries (NVDA +94%, MSFT +32%)",
-    "Low overlap with high-debt sectors — balance sheet quality is solid",
-    "Cost basis discipline: average hold period > 2 years on top 5 names",
+    "Unrealised gains concentrated in cash-generative AI beneficiaries (NVDA +94%, MSFT +32%)",
+    "Minimal overlap with high-leverage sectors; aggregate net debt / EBITDA below peer median",
+    "Average holding period above two years on the top five names",
   ],
   risks: [
     "Single-name concentration: NVDA alone is 24% of portfolio value",
-    "Sector correlation: 62% technology — macro rate shocks hit all positions",
-    "No fixed-income or defensive allocation despite moderate risk profile",
+    "Sector correlation: 62% technology means one macro shock moves every major line",
+    "No fixed income or defensive sleeve despite a stated moderate mandate",
   ],
   holdings: [
     {
       ticker: "NVDA",
-      action: "CONSIDER_REDUCING" as const,
-      verdict: "TRIM",
+      verdict: "Recycle" as const,
+      weight: "24.1%",
       reason:
-        "Exceptional run but position size exceeds prudent limits. Trim toward 12–15% and redeploy into diversified ETF exposure.",
+        "Exceptional run, but position size exceeds the mandate ceiling. Trim toward 12–15% and redeploy into diversified exposure.",
     },
     {
       ticker: "MSFT",
-      action: "HOLD" as const,
-      verdict: "HOLD",
+      verdict: "Hold" as const,
+      weight: "16.8%",
       reason:
-        "Core compounder with cloud + AI optionality. Size is elevated but fundamentals support maintaining a large position.",
+        "Core compounder with cloud and AI optionality. Size is elevated, but filing-level fundamentals support keeping it large.",
     },
     {
       ticker: "AAPL",
-      action: "CONSIDER_ADDING" as const,
-      verdict: "ACCUMULATE",
+      verdict: "Accumulate" as const,
+      weight: "6.4%",
       reason:
-        "Underweight vs historical allocation. Services margin expansion and capital return program support gradual adds on weakness.",
+        "Underweight versus historical allocation. Services margin expansion and the buyback support gradual adds on weakness.",
     },
   ],
   additions: [
     {
       ticker: "VTI",
-      suggestion: "Broad US equity ETF",
-      rationale: "Reduce single-name risk while staying invested in US growth.",
+      suggestion: "Broad US equity",
+      rationale: "Cuts single-name risk while staying invested in US growth.",
     },
     {
       ticker: "BND",
-      suggestion: "Investment-grade bond ETF",
-      rationale: "Add ballast aligned with moderate risk tolerance.",
+      suggestion: "Investment-grade bonds",
+      rationale: "Adds ballast in line with a moderate mandate.",
     },
   ],
 };
 
-const ACTION_VARIANT: Record<
-  string,
-  "destructive" | "warning" | "success" | "secondary"
-> = {
-  CONSIDER_SELLING: "destructive",
-  CONSIDER_REDUCING: "warning",
-  HOLD: "secondary",
-  CONSIDER_ADDING: "success",
+const VERDICT_TONE: Record<string, string> = {
+  Accumulate: "bg-success-soft text-success",
+  Hold: "bg-warning-soft text-warning",
+  Recycle: "bg-destructive-soft text-destructive",
 };
-
-function formatAction(action: string): string {
-  return action.replace("CONSIDER_", "Consider ").replace("_", " ");
-}
 
 export function LandingSampleReport() {
   const { riskScore } = SAMPLE;
-  const isAbove = riskScore.portfolio > riskScore.comfort + 1;
+  const gap = (riskScore.portfolio - riskScore.comfort).toFixed(1);
 
   return (
-    <section className="relative z-10 border-y border-border/50 bg-gradient-to-b from-background via-muted/15 to-background py-16 md:py-20">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="text-center">
-          <p className="text-sm font-medium uppercase tracking-widest text-primary">
-            Sample analysis
-          </p>
-          <h2 className="mt-2 text-balance text-2xl font-semibold tracking-tight md:text-3xl">
-            This is what you get — not a generic chat reply
+    <section className="border-t bg-surface py-16 md:py-[70px]">
+      <div className="mx-auto max-w-[1160px] px-6 md:px-10">
+        <div className="max-w-[600px]">
+          <h2 className="text-[27px] font-semibold leading-tight tracking-tight">
+            What the report actually says.
           </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-            Structured report with risk scoring, per-holding actions, and concrete
-            rebalancing ideas — generated from your actual holdings and investor
-            profile.
+          <p className="mt-3 text-[14.5px] leading-relaxed text-muted-foreground">
+            Not a score and a shrug. A written case for every position, the risk
+            measured against the mandate you set, and the specific trades that
+            would close the gap.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-5">
-          <Card className="border-amber-500/30 bg-amber-500/[0.04] lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Target className="h-4 w-4 text-amber-500" />
-                Risk vs your profile
-              </CardTitle>
-              <CardDescription>{SAMPLE.portfolioLabel}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Portfolio risk</p>
-                  <p className="text-4xl font-semibold tabular-nums">
-                    {riskScore.portfolio}
-                    <span className="text-lg text-muted-foreground">/10</span>
-                  </p>
-                  <Badge variant="warning" className="mt-1">
-                    {riskScore.label}
-                  </Badge>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Your comfort</p>
-                  <p className="text-2xl font-semibold tabular-nums text-muted-foreground">
-                    {riskScore.comfort}/10
-                  </p>
-                </div>
-              </div>
-              <div className="relative h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-destructive"
-                  style={{ width: `${(riskScore.portfolio / 10) * 100}%` }}
-                />
-                <div
-                  className="absolute top-1/2 h-4 w-0.5 -translate-y-1/2 bg-foreground"
-                  style={{ left: `${(riskScore.comfort / 10) * 100}%` }}
-                />
-              </div>
-              {isAbove && (
-                <p className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  Portfolio risk is 1.7 points above your moderate comfort level —
-                  rebalancing recommended.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+        <div className="mt-10 grid gap-4 lg:grid-cols-5">
+          {/* Risk vs mandate */}
+          <div className="border bg-background p-5 lg:col-span-2">
+            <div className="text-[11px] uppercase tracking-wide text-faint">
+              Risk versus mandate
+            </div>
+            <div className="mt-1 text-[12px] text-muted-foreground">
+              {SAMPLE.portfolioLabel}
+            </div>
 
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-4 w-4 text-primary" />
-                Executive summary
-              </CardTitle>
-              <CardDescription>{SAMPLE.generatedAt}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <p className="text-sm leading-relaxed text-foreground/90">
-                {SAMPLE.summary}
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Strengths
-                  </h4>
-                  <ul className="space-y-1.5 text-xs text-muted-foreground">
-                    {SAMPLE.strengths.map((s) => (
-                      <li key={s} className="flex gap-2">
-                        <span className="text-emerald-500">•</span>
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
+            <div className="mt-6 flex items-end justify-between">
+              <div>
+                <div className="text-[12px] text-muted-foreground">
+                  Measured risk
                 </div>
-                <div>
-                  <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-destructive">
-                    <Shield className="h-3.5 w-3.5" />
-                    Risks
-                  </h4>
-                  <ul className="space-y-1.5 text-xs text-muted-foreground">
-                    {SAMPLE.risks.map((r) => (
-                      <li key={r} className="flex gap-2">
-                        <span className="text-destructive">•</span>
-                        {r}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="mt-1 font-mono text-[38px] font-semibold leading-none">
+                  {riskScore.portfolio}
+                  <span className="text-[18px] text-faint">/10</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="mt-6 border-primary/25 bg-primary/[0.03]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Zap className="h-4 w-4 text-primary" />
-              Action plan — holdings to review
-            </CardTitle>
-            <CardDescription>
-              Per-ticker verdicts with reasons. Tap through in the full product.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-3 md:grid-cols-3">
-              {SAMPLE.holdings.map((h) => (
-                <div
-                  key={h.ticker}
-                  className="rounded-lg border bg-background/80 p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={ACTION_VARIANT[h.action] ?? "secondary"}
-                      className="font-mono text-xs"
-                    >
-                      {h.ticker}
-                    </Badge>
-                    {h.verdict && (
-                      <Badge variant="outline" className="font-mono text-[10px]">
-                        {h.verdict}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs font-medium">
-                    {formatAction(h.action)}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {h.reason}
-                  </p>
+              <div className="text-right">
+                <div className="text-[12px] text-muted-foreground">
+                  Your comfort level
                 </div>
+                <div className="mt-1 font-mono text-[22px] font-semibold leading-none text-muted-foreground">
+                  {riskScore.comfort}/10
+                </div>
+              </div>
+            </div>
+
+            <div className="relative mt-5 h-2 bg-border">
+              <div
+                className="absolute inset-y-0 left-0 bg-foreground"
+                style={{ width: `${(riskScore.portfolio / 10) * 100}%` }}
+              />
+              <div
+                className="absolute -top-1 h-4 w-0.5 bg-destructive"
+                style={{ left: `${(riskScore.comfort / 10) * 100}%` }}
+              />
+            </div>
+            <div className="mt-2 flex justify-between font-mono text-[10.5px] text-faint">
+              {[0, 2, 4, 6, 8, 10].map((t) => (
+                <span key={t}>{t}</span>
               ))}
             </div>
 
-            <div>
-              <h4 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                Research next
-              </h4>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {SAMPLE.additions.map((a) => (
-                  <div
-                    key={a.ticker}
-                    className="flex items-start gap-3 rounded-lg border bg-background/80 p-3"
-                  >
-                    <Badge variant="secondary" className="shrink-0 font-mono text-xs">
-                      {a.ticker}
-                    </Badge>
-                    <div>
-                      <p className="text-sm font-medium">{a.suggestion}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {a.rationale}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+            <p className="mt-5 border-t pt-4 text-[12px] leading-relaxed text-muted-foreground">
+              <span className="font-medium text-destructive">
+                +{gap} above mandate.
+              </span>{" "}
+              Driven by concentration in two names rather than by the volatility
+              of the book as a whole, which is why the fix is a trim, not a
+              de-risk.
+            </p>
+          </div>
+
+          {/* Executive summary */}
+          <div className="border bg-background p-5 lg:col-span-3">
+            <div className="text-[11px] uppercase tracking-wide text-faint">
+              Executive summary
+            </div>
+            <p className="mt-3 text-[13px] leading-[1.75]">{SAMPLE.summary}</p>
+
+            <div className="mt-5 grid gap-5 border-t pt-5 sm:grid-cols-2">
+              <div>
+                <h4 className="text-[11px] font-medium uppercase tracking-wide text-success">
+                  What is working
+                </h4>
+                <ul className="mt-2.5 space-y-2">
+                  {SAMPLE.strengths.map((s) => (
+                    <li
+                      key={s}
+                      className="flex gap-2 text-[12px] leading-relaxed text-muted-foreground"
+                    >
+                      <span className="mt-[7px] h-1 w-1 shrink-0 bg-success" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-[11px] font-medium uppercase tracking-wide text-destructive">
+                  What is exposed
+                </h4>
+                <ul className="mt-2.5 space-y-2">
+                  {SAMPLE.risks.map((r) => (
+                    <li
+                      key={r}
+                      className="flex gap-2 text-[12px] leading-relaxed text-muted-foreground"
+                    >
+                      <span className="mt-[7px] h-1 w-1 shrink-0 bg-destructive" />
+                      {r}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="flex flex-col items-center gap-3 border-t border-border/60 pt-6 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="gap-2">
-                <Link href="/sign-up">
-                  <Sparkles className="h-4 w-4" />
-                  Generate yours — free to start
-                </Link>
-              </Button>
-              <Button variant="outline" asChild size="lg" className="gap-2">
-                <Link href="/dashboard">
-                  View demo dashboard
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
+        {/* Action plan */}
+        <div className="mt-4 border bg-background">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-4">
+            <div className="text-[13.5px] font-semibold">
+              Positions to act on
             </div>
-            <p className="text-center text-[11px] text-muted-foreground">
-              Sample data for illustration. Not financial advice.
+            <div className="text-[11px] text-faint">
+              Every verdict links back to the filing behind it
+            </div>
+          </div>
+
+          <div className="hairline-grid grid border-0 md:grid-cols-3">
+            {SAMPLE.holdings.map((h) => (
+              <div key={h.ticker} className="bg-background p-5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[15px] font-semibold">
+                    {h.ticker}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-[5px] px-2 py-0.5 text-[11px] font-medium",
+                      VERDICT_TONE[h.verdict],
+                    )}
+                  >
+                    {h.verdict}
+                  </span>
+                </div>
+                <div className="mt-1 font-mono text-[11px] text-faint">
+                  {h.weight} of book
+                </div>
+                <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
+                  {h.reason}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t px-5 py-5">
+            <h4 className="text-[11px] uppercase tracking-wide text-faint">
+              Where the proceeds could go
+            </h4>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {SAMPLE.additions.map((a) => (
+                <div key={a.ticker} className="flex items-start gap-3 border p-3">
+                  <span className="mt-px shrink-0 rounded-md border bg-surface px-2 py-0.5 font-mono text-[11px] font-medium">
+                    {a.ticker}
+                  </span>
+                  <div>
+                    <p className="text-[13px] font-medium">{a.suggestion}</p>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {a.rationale}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 border-t px-5 py-5">
+            <Button asChild>
+              <Link href="/sign-up">Generate this for your book</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard">Open the worked example</Link>
+            </Button>
+            <p className="text-[11px] text-faint">
+              Sample figures, shown for illustration. Not financial advice.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -38,7 +38,7 @@ export function GoogleSignInButton({ label = "Continue with Google", className }
     <Button
       type="button"
       variant="outline"
-      className={cn("w-full gap-2 border-border/80 bg-card/30", className)}
+      className={cn("w-full", className)}
       onClick={() => {
         begin();
         window.location.assign("/api/auth/google");

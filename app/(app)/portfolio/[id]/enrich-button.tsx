@@ -57,32 +57,32 @@ export function EnrichButton({
       >
         {state === "loading" ? (
           <>
-            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Fetching prices…
           </>
         ) : state === "done" ? (
           <>
-            <CheckCircle2 className="mr-2 h-3.5 w-3.5 text-green-600" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
             Refreshed ({enrichedCount} holdings)
           </>
         ) : state === "error" ? (
           <>
-            <AlertTriangle className="mr-2 h-3.5 w-3.5 text-destructive" />
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
             Retry refresh
           </>
         ) : (
           <>
-            <RefreshCw className="mr-2 h-3.5 w-3.5" />
+            <RefreshCw className="h-3.5 w-3.5" />
             Refresh market data
           </>
         )}
       </Button>
-      <span className="text-[10px] text-muted-foreground">
+      <span className="text-[11px] text-faint">
         Last updated: {ago}
         {provider && state === "done" && ` via ${formatProviderName(provider)}`}
       </span>
       {state === "error" && errorMsg && (
-        <p className="text-xs text-destructive">{errorMsg}</p>
+        <p className="text-[11.5px] text-destructive">{errorMsg}</p>
       )}
     </div>
   );

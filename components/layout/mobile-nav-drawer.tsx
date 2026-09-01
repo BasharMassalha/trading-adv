@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { X, SquareTerminal } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { clientEnv } from "@/lib/env";
+import { BrandLockup } from "@/components/brand";
 import { NavLinks } from "@/components/layout/nav-links";
 
 type MobileNavDrawerProps = {
@@ -36,7 +36,7 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
         type="button"
         aria-label="Close navigation menu"
         className={cn(
-          "fixed inset-0 z-50 bg-background/70 backdrop-blur-sm transition-opacity md:hidden",
+          "fixed inset-0 z-50 bg-foreground/40 transition-opacity md:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onClose}
@@ -44,19 +44,12 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
       <aside
         aria-hidden={!open}
         className={cn(
-          "fixed inset-y-0 left-0 z-[60] flex w-[min(100vw-3rem,18rem)] flex-col border-r bg-card shadow-2xl transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 left-0 z-[60] flex w-[min(100vw-3rem,17rem)] flex-col border-r bg-surface transition-transform duration-300 md:hidden",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b px-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <SquareTerminal className="h-4 w-4" />
-            </div>
-            <span className="text-base font-semibold tracking-tight">
-              {clientEnv.NEXT_PUBLIC_APP_NAME}
-            </span>
-          </div>
+        <div className="flex h-14 items-center justify-between border-b px-3">
+          <BrandLockup size="sm" />
           <Button
             variant="ghost"
             size="icon"
@@ -67,18 +60,14 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
           </Button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="flex-1 overflow-y-auto px-3 pb-4">
           <NavLinks onNavigate={onClose} />
         </nav>
 
-        <div className="border-t p-4">
-          <div className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Pro tip</p>
-            <p className="mt-1">
-              Upload a broker screenshot and let the AI advisor review your risk
-              profile.
-            </p>
-          </div>
+        <div className="border-t px-5 py-3 text-[11px] leading-relaxed text-faint">
+          Analysis is evidence-led and cited.
+          <br />
+          Nothing executes without you.
         </div>
       </aside>
     </>

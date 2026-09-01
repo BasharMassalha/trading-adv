@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   Loader2,
   Target,
@@ -14,28 +15,14 @@ import {
   Shield,
   Clock,
   BarChart3,
-  Sparkles,
   MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { InvestorProfileView } from "@/server/services/analysis.service";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   riskTolerance: z.enum(["CONSERVATIVE", "MODERATE", "AGGRESSIVE"]),
@@ -231,19 +218,16 @@ export function InvestorProfileForm({ initialProfile }: Props) {
   // Empty state for new users
   if (!initialProfile) {
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-background">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <CardTitle>Set up your investor profile</CardTitle>
-            <CardDescription>
-              Help the AI advisor provide personalized analysis by sharing your
-              investment preferences. This only takes a minute.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="border border-border-strong bg-surface p-5">
+          <h2 className="text-[13.5px] font-semibold tracking-tight">
+            Set up your investor profile
+          </h2>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+            The advisor uses these constraints to judge your holdings. It takes
+            about a minute.
+          </p>
+        </div>
 
         <ProfileFormFields
           watchRisk={watchRisk}
@@ -255,19 +239,19 @@ export function InvestorProfileForm({ initialProfile }: Props) {
           errors={errors}
         />
 
-        <div className="flex items-center gap-4">
-          <Button type="submit" disabled={saving} className="gap-2">
+        <div className="flex items-center gap-3 border-t pt-4">
+          <Button type="submit" disabled={saving}>
             {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
             ) : (
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4 stroke-[1.6]" />
             )}
             Save profile
           </Button>
           {success && (
-            <span className="flex items-center gap-1 text-sm text-green-600">
-              <CheckCircle2 className="h-4 w-4" />
-              Profile saved!
+            <span className="flex items-center gap-1.5 text-[12.5px] text-success">
+              <CheckCircle2 className="h-4 w-4 stroke-[1.6]" />
+              Profile saved
             </span>
           )}
         </div>
@@ -277,7 +261,7 @@ export function InvestorProfileForm({ initialProfile }: Props) {
 
   // Edit state for existing users
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <ProfileFormFields
         watchRisk={watchRisk}
         watchHorizon={watchHorizon}
@@ -288,23 +272,74 @@ export function InvestorProfileForm({ initialProfile }: Props) {
         errors={errors}
       />
 
-      <div className="flex items-center gap-4">
-        <Button type="submit" disabled={saving} className="gap-2">
+      <div className="flex items-center gap-3 border-t pt-4">
+        <Button type="submit" disabled={saving}>
           {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
           ) : (
-            <CheckCircle2 className="h-4 w-4" />
+            <Check className="h-4 w-4 stroke-[1.6]" />
           )}
           Update profile
         </Button>
         {success && (
-          <span className="flex items-center gap-1 text-sm text-green-600">
-            <CheckCircle2 className="h-4 w-4" />
-            Changes saved!
+          <span className="flex items-center gap-1.5 text-[12.5px] text-success">
+            <CheckCircle2 className="h-4 w-4 stroke-[1.6]" />
+            Changes saved
           </span>
         )}
       </div>
     </form>
+  );
+}
+
+/** Flat hairline panel used for each block of the form. */
+function Panel({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  description?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border bg-surface p-5">
+      <div className="flex items-center gap-2">
+        {Icon ? <Icon className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" /> : null}
+        <h2 className="text-[13.5px] font-semibold tracking-tight">{title}</h2>
+      </div>
+      {description ? (
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+const OPTION_BASE =
+  "flex flex-col items-start border bg-surface p-4 text-left transition-colors hover:bg-background";
+const OPTION_SELECTED = "border-primary bg-primary-soft hover:bg-primary-soft";
+
+/** Chip that appends a suggestion into the adjacent free-text input. */
+function SuggestionChip({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-md border bg-surface px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-background"
+    >
+      + {label}
+    </button>
   );
 }
 
@@ -328,171 +363,135 @@ function ProfileFormFields({
   return (
     <>
       {/* Risk Tolerance */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            Risk Tolerance
-          </CardTitle>
-          <CardDescription>
-            How much volatility are you comfortable with?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {RISK_OPTIONS.map((opt) => (
+      <Panel
+        title="Risk tolerance"
+        description="How much volatility are you comfortable with?"
+        icon={Shield}
+      >
+        <div className="grid gap-2 sm:grid-cols-3">
+          {RISK_OPTIONS.map((opt) => {
+            const selected = watchRisk === opt.value;
+            return (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setValue("riskTolerance", opt.value)}
-                className={`flex flex-col items-start rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 ${
-                  watchRisk === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border"
-                }`}
+                className={cn(OPTION_BASE, selected && OPTION_SELECTED)}
               >
                 <opt.icon
-                  className={`mb-2 h-5 w-5 ${
-                    watchRisk === opt.value
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
+                  className={cn(
+                    "mb-2 h-4 w-4 stroke-[1.6]",
+                    selected ? "text-primary" : "text-faint",
+                  )}
                 />
-                <span className="font-medium">{opt.label}</span>
-                <span className="mt-1 text-xs text-muted-foreground">
+                <span className="text-[13px] font-medium">{opt.label}</span>
+                <span className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   {opt.desc}
                 </span>
               </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+        </div>
+      </Panel>
 
       {/* Investment Horizon */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
-            Investment Horizon
-          </CardTitle>
-          <CardDescription>
-            How long do you plan to stay invested?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {HORIZON_OPTIONS.map((opt) => (
+      <Panel
+        title="Investment horizon"
+        description="How long do you plan to stay invested?"
+        icon={Clock}
+      >
+        <div className="grid gap-2 sm:grid-cols-3">
+          {HORIZON_OPTIONS.map((opt) => {
+            const selected = watchHorizon === opt.value;
+            return (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setValue("investmentHorizon", opt.value)}
-                className={`flex flex-col items-start rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 ${
-                  watchHorizon === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border"
-                }`}
+                className={cn(OPTION_BASE, selected && OPTION_SELECTED)}
               >
-                <span className="font-medium">{opt.label}</span>
-                <span className="mt-1 text-xs text-muted-foreground">
+                <span className="text-[13px] font-medium">{opt.label}</span>
+                <span className="mt-1 font-mono text-[12px] text-muted-foreground">
                   {opt.desc}
                 </span>
               </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+        </div>
+      </Panel>
 
       {/* Investment Goal */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" />
-            Investment Goal
-          </CardTitle>
-          <CardDescription>
-            What are you primarily trying to achieve?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {GOAL_OPTIONS.map((opt) => (
+      <Panel
+        title="Investment goal"
+        description="What are you primarily trying to achieve?"
+        icon={Target}
+      >
+        <div className="grid gap-2 sm:grid-cols-2">
+          {GOAL_OPTIONS.map((opt) => {
+            const selected = watchGoal === opt.value;
+            return (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setValue("investmentGoal", opt.value)}
-                className={`flex flex-col items-start rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 ${
-                  watchGoal === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border"
-                }`}
+                className={cn(OPTION_BASE, selected && OPTION_SELECTED)}
               >
-                <span className="font-medium">{opt.label}</span>
-                <span className="mt-1 text-xs text-muted-foreground">
+                <span className="text-[13px] font-medium">{opt.label}</span>
+                <span className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   {opt.desc}
                 </span>
               </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+        </div>
+      </Panel>
 
       {/* Asset Preference */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Asset Preference
-          </CardTitle>
-          <CardDescription>
-            What type of investments do you prefer?
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {ASSET_OPTIONS.map((opt) => (
+      <Panel
+        title="Asset preference"
+        description="What type of investments do you prefer?"
+        icon={BarChart3}
+      >
+        <div className="grid gap-2 sm:grid-cols-2">
+          {ASSET_OPTIONS.map((opt) => {
+            const selected = watchAsset === opt.value;
+            return (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setValue("assetPreference", opt.value)}
-                className={`flex flex-col items-start rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 ${
-                  watchAsset === opt.value
-                    ? "border-primary bg-primary/5"
-                    : "border-border"
-                }`}
+                className={cn(OPTION_BASE, selected && OPTION_SELECTED)}
               >
-                <span className="font-medium">{opt.label}</span>
-                <span className="mt-1 text-xs text-muted-foreground">
+                <span className="text-[13px] font-medium">{opt.label}</span>
+                <span className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   {opt.desc}
                 </span>
               </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+        </div>
+      </Panel>
 
       {/* Sector and Region Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sector & Region Preferences</CardTitle>
-          <CardDescription>
-            Optional: specify sectors or regions you prefer or wish to avoid.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Panel
+        title="Sectors and regions"
+        description="Optional. Sectors or regions you prefer, and any you want excluded."
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="preferredRegions">Preferred regions</Label>
-            <input
+            <Label htmlFor="preferredRegions" className="text-[12.5px]">
+              Preferred regions
+            </Label>
+            <Input
               id="preferredRegions"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               placeholder="e.g. US, Europe, Asia Pacific"
               {...register("preferredRegions")}
             />
             <div className="flex flex-wrap gap-1.5">
               {COMMON_REGIONS.map((r) => (
-                <Badge
+                <SuggestionChip
                   key={r}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-muted"
+                  label={r}
                   onClick={() => {
                     const input = document.getElementById(
                       "preferredRegions",
@@ -505,27 +504,25 @@ function ProfileFormFields({
                       input.value = [...current, r].join(", ");
                     }
                   }}
-                >
-                  + {r}
-                </Badge>
+                />
               ))}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="preferredSectors">Preferred sectors</Label>
-            <input
+            <Label htmlFor="preferredSectors" className="text-[12.5px]">
+              Preferred sectors
+            </Label>
+            <Input
               id="preferredSectors"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               placeholder="e.g. Technology, Healthcare"
               {...register("preferredSectors")}
             />
             <div className="flex flex-wrap gap-1.5">
               {COMMON_SECTORS.slice(0, 6).map((s) => (
-                <Badge
+                <SuggestionChip
                   key={s}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-muted"
+                  label={s}
                   onClick={() => {
                     const input = document.getElementById(
                       "preferredSectors",
@@ -538,79 +535,61 @@ function ProfileFormFields({
                       input.value = [...current, s].join(", ");
                     }
                   }}
-                >
-                  + {s}
-                </Badge>
+                />
               ))}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="avoidedSectors">Sectors to avoid</Label>
-            <input
+            <Label htmlFor="avoidedSectors" className="text-[12.5px]">
+              Sectors to avoid
+            </Label>
+            <Input
               id="avoidedSectors"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               placeholder="e.g. Tobacco, Weapons, Gambling"
               {...register("avoidedSectors")}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Strategy message — the investor's own words */}
-      <Card className="border-primary/30 bg-primary/5">
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <MessageSquare className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <CardTitle>Your strategy, goals & preferences</CardTitle>
-              <CardDescription>
-                Describe in your own words what you want from this portfolio.
-                The AI weights this above the dropdowns above — including how
-                aggressively you want it to chase returns.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <Panel
+        title="Your strategy, goals and preferences"
+        description="Describe in your own words what you want from this portfolio. The AI weights this above the selections above, including how aggressively you want it to pursue returns."
+        icon={MessageSquare}
+      >
+        <div className="space-y-2">
           <Textarea
             id="strategyMessage"
             placeholder="e.g. I want to grow this account meaningfully over 10 years and I'm fine with volatility. Let winners run instead of trimming them just for size. I like founder-led tech and energy, avoid tobacco. Tell me where I can realistically add return, not just where to be safe."
-            className="min-h-[140px] bg-background"
+            className="min-h-[140px]"
             maxLength={2000}
             {...register("strategyMessage")}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] text-faint">
             Mention your return expectations, how much risk you accept, names or
             themes you like, and anything the advisor should never suggest.
           </p>
           {errors.strategyMessage && (
-            <p className="text-xs text-destructive">
+            <p className="text-[12px] text-destructive">
               {errors.strategyMessage.message}
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Additional Notes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Additional Notes</CardTitle>
-          <CardDescription>
-            Constraints or personal context — taxes, income stability, upcoming
-            expenses.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="e.g. I'm saving for a house down payment in 5 years, have a stable income, and can handle some short-term losses..."
-            className="min-h-[100px]"
-            {...register("notes")}
-          />
-        </CardContent>
-      </Card>
+      <Panel
+        title="Additional notes"
+        description="Constraints or personal context: taxes, income stability, upcoming expenses."
+      >
+        <Textarea
+          placeholder="e.g. I'm saving for a house down payment in 5 years, have a stable income, and can handle some short-term losses..."
+          className="min-h-[100px]"
+          {...register("notes")}
+        />
+      </Panel>
     </>
   );
 }

@@ -1,41 +1,41 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  ArrowRight,
-  AlertTriangle,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { DollarSign, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/dashboard/stat-card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PageHeader, SectionTitle } from "@/components/layout/page-header";
+import { StatCard, StatGrid } from "@/components/dashboard/stat-card";
 import { MarketToday } from "@/components/dashboard/market-today";
 import { FuturePortfolioProjection } from "@/components/dashboard/future-portfolio-projection";
 import { RiskScoreCard } from "@/components/dashboard/risk-score-card";
-import { AllocationChart } from "@/components/charts/allocation-chart";
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { SectorAllocationBar } from "@/components/charts/sector-allocation-bar";
+import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import { computeRiskScore } from "@/lib/portfolio/risk-score";
 import {
   computePortfolioStats,
   MOCK_HOLDINGS,
+  MOCK_PERFORMANCE_SERIES,
 } from "@/lib/mock-data";
 import { getMarketTodaySnapshot } from "@/server/services/market-snapshot.service";
 import { getSession } from "@/lib/auth";
-import { enrichmentService, type PortfolioView } from "@/server/services/enrichment.service";
+import {
+  enrichmentService,
+  type PortfolioView,
+} from "@/server/services/enrichment.service";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
 import { investmentProfileRepository } from "@/server/repositories/investment-profile.repository";
 import { aiReportRepository } from "@/server/repositories/ai-report.repository";
 import { EmptyDashboard } from "@/components/empty-states";
 import { buildProjectionReturnAssumption } from "@/lib/projections/assumptions";
+import { DashboardPortfolioPicker } from "@/components/dashboard/dashboard-portfolio-picker";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Dashboard" };
@@ -53,9 +53,26 @@ type DashboardState =
       investmentGoal: string | null;
       riskTolerance: string | null;
       hasLatestAnalysis: boolean;
+      portfolios: { id: string; name: string; holdingCount: number }[];
     };
 
-async function getDashboardState(): Promise<DashboardState> {
+/** Unified row shape so real and demo books render through the same table. */
+type Row = {
+  symbol: string;
+  name: string;
+  sector: string | null;
+  quantity: number | null;
+  averageCost: number | null;
+  price: number | null;
+  marketValue: number | null;
+  gain: number | null;
+  gainPct: number | null;
+  weight: number | null;
+};
+
+async function getDashboardState(
+  selectedPortfolioId?: string,
+): Promise<DashboardState> {
   const session = await getSession();
 
   // Not logged in - show demo for anonymous visitors
@@ -70,15 +87,28 @@ async function getDashboardState(): Promise<DashboardState> {
       return { type: "empty" };
     }
 
-    // Load the most recent portfolio
-    const latest = portfolios[0];
-    const data = await enrichmentService.getPortfolioView(latest.id);
+    const portfolioOptions = portfolios.map((p) => ({
+      id: p.id,
+      name: p.name,
+      holdingCount: p._count?.holdings ?? 0,
+    }));
+
+    const selected =
+      (selectedPortfolioId
+        ? portfolios.find((p) => p.id === selectedPortfolioId)
+        : undefined) ?? portfolios[0];
+
+    const data = await enrichmentService.getPortfolioView(selected.id);
     if (!data) {
       return { type: "empty" };
     }
 
-    const profile = await investmentProfileRepository.findByUserId(session.userId);
-    const latestReport = await aiReportRepository.findLatestForPortfolio(data.id);
+    const profile = await investmentProfileRepository.findByUserId(
+      session.userId,
+    );
+    const latestReport = await aiReportRepository.findLatestForPortfolio(
+      data.id,
+    );
 
     return {
       type: "loaded",
@@ -86,6 +116,7 @@ async function getDashboardState(): Promise<DashboardState> {
       investmentGoal: profile?.investmentGoal ?? null,
       riskTolerance: profile?.riskTolerance ?? null,
       hasLatestAnalysis: latestReport != null,
+      portfolios: portfolioOptions,
     };
   } catch {
     return { type: "empty" };
@@ -96,10 +127,16 @@ async function getDashboardState(): Promise<DashboardState> {
 // Page
 // ---------------------------------------------------------------------------
 
-export default async function DashboardPage() {
-  const state = await getDashboardState();
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: { portfolio?: string };
+}) {
+  const state = await getDashboardState(searchParams?.portfolio?.trim());
 
-  let marketSnapshot = null as Awaited<ReturnType<typeof getMarketTodaySnapshot>> | null;
+  let marketSnapshot = null as Awaited<
+    ReturnType<typeof getMarketTodaySnapshot>
+  > | null;
   try {
     marketSnapshot = await getMarketTodaySnapshot();
   } catch (e) {
@@ -117,7 +154,10 @@ export default async function DashboardPage() {
   const realData = state.type === "loaded" ? state.data : null;
   const investmentGoal = state.type === "loaded" ? state.investmentGoal : null;
   const riskTolerance = state.type === "loaded" ? state.riskTolerance : null;
-  const hasLatestAnalysis = state.type === "loaded" ? state.hasLatestAnalysis : false;
+  const hasLatestAnalysis =
+    state.type === "loaded" ? state.hasLatestAnalysis : false;
+  const portfolioOptions =
+    state.type === "loaded" ? state.portfolios : [];
   const usingMock = isAnonymous;
 
   const projectionAssumption = buildProjectionReturnAssumption({
@@ -134,14 +174,7 @@ export default async function DashboardPage() {
   let holdingCount: number;
   let isEnriched: boolean;
 
-  let topMovers: {
-    symbol: string;
-    name: string;
-    sector: string | null;
-    marketValue: number | null;
-    gainPct: number | null;
-  }[] = [];
-
+  let rows: Row[] = [];
   let sectorAlloc: { name: string; value: number }[] = [];
 
   if (realData) {
@@ -151,16 +184,19 @@ export default async function DashboardPage() {
     holdingCount = realData.holdingCount;
     isEnriched = realData.lastEnrichedAt != null;
 
-    topMovers = [...realData.holdings]
-      .filter((h) => h.unrealizedGainLossPct != null)
-      .sort((a, b) => (b.unrealizedGainLossPct ?? 0) - (a.unrealizedGainLossPct ?? 0))
-      .slice(0, 4)
+    rows = [...realData.holdings]
+      .sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))
       .map((h) => ({
         symbol: h.symbol,
         name: h.name,
         sector: h.sector,
+        quantity: h.quantity,
+        averageCost: h.averageCost,
+        price: h.currentPrice,
         marketValue: h.marketValue,
+        gain: h.unrealizedGainLoss,
         gainPct: h.unrealizedGainLossPct,
+        weight: h.weight != null ? h.weight * 100 : null,
       }));
 
     sectorAlloc = realData.sectorAllocation;
@@ -172,15 +208,20 @@ export default async function DashboardPage() {
     holdingCount = stats.rows.length;
     isEnriched = false;
 
-    topMovers = stats.rows
-      .sort((a, b) => b.gainPct - a.gainPct)
-      .slice(0, 4)
+    rows = [...stats.rows]
+      .sort((a, b) => b.marketValue - a.marketValue)
       .map((r) => ({
         symbol: r.symbol,
         name: r.name,
         sector: r.sector,
+        quantity: r.quantity,
+        averageCost: r.avgCost,
+        price: r.price,
         marketValue: r.marketValue,
+        gain: r.gain,
         gainPct: r.gainPct,
+        weight:
+          stats.totalValue > 0 ? (r.marketValue / stats.totalValue) * 100 : null,
       }));
 
     sectorAlloc = Object.entries(
@@ -191,17 +232,15 @@ export default async function DashboardPage() {
     ).map(([name, value]) => ({ name, value }));
   }
 
-  const biggestLoser = realData
-    ? [...realData.holdings]
-        .filter((h) => h.unrealizedGainLossPct != null)
-        .sort((a, b) => (a.unrealizedGainLossPct ?? 0) - (b.unrealizedGainLossPct ?? 0))[0]
-    : null;
-
-  const topConcentration = realData
-    ? [...realData.holdings]
-        .filter((h) => h.weight != null)
-        .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))[0]
-    : null;
+  const withPct = rows.filter((r) => r.gainPct != null);
+  const biggestLoser =
+    withPct.length > 0
+      ? [...withPct].sort((a, b) => (a.gainPct ?? 0) - (b.gainPct ?? 0))[0]
+      : null;
+  const topConcentration =
+    rows.filter((r) => r.weight != null).sort(
+      (a, b) => (b.weight ?? 0) - (a.weight ?? 0),
+    )[0] ?? null;
 
   const riskScoreInput = realData
     ? {
@@ -216,16 +255,20 @@ export default async function DashboardPage() {
       }
     : (() => {
         const stats = computePortfolioStats(MOCK_HOLDINGS);
-        const sectorMap = MOCK_HOLDINGS.reduce<Record<string, number>>((acc, h) => {
-          const mv = h.quantity * h.price;
-          acc[h.sector] = (acc[h.sector] ?? 0) + mv;
-          return acc;
-        }, {});
+        const sectorMap = MOCK_HOLDINGS.reduce<Record<string, number>>(
+          (acc, h) => {
+            const mv = h.quantity * h.price;
+            acc[h.sector] = (acc[h.sector] ?? 0) + mv;
+            return acc;
+          },
+          {},
+        );
         return {
           holdings: stats.rows.map((r) => ({
             symbol: r.symbol,
             type: "STOCK",
-            weight: stats.totalValue > 0 ? r.marketValue / stats.totalValue : null,
+            weight:
+              stats.totalValue > 0 ? r.marketValue / stats.totalValue : null,
           })),
           sectorAllocation: Object.entries(sectorMap).map(([name, value]) => ({
             name,
@@ -237,64 +280,87 @@ export default async function DashboardPage() {
       })();
 
   const riskScore = computeRiskScore(riskScoreInput);
+  const valueSpark = usingMock
+    ? MOCK_PERFORMANCE_SERIES.map((p) => p.value)
+    : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            {isAnonymous
-              ? "Demo data — sign in to see your real holdings."
-              : `Showing your most recent portfolio${!isEnriched ? " (prices not yet loaded)" : ""}.`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/portfolio/upload">Upload portfolio</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/advisor">
-              Ask AI advisor <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description={
+          isAnonymous
+            ? "Worked example using sample positions. Sign in to analyse your own book."
+            : isEnriched
+              ? "Valuation and allocation for the portfolio selected below, at the latest close."
+              : "Valuation and allocation for the portfolio selected below. Prices not loaded yet."
+        }
+        actions={
+          <>
+            {!isAnonymous && portfolioOptions.length > 0 && realData ? (
+              <DashboardPortfolioPicker
+                portfolios={portfolioOptions}
+                selectedId={realData.id}
+              />
+            ) : null}
+            <Button variant="outline" asChild>
+              <Link href="/portfolio/upload">Upload portfolio</Link>
+            </Button>
+            <Button asChild>
+              <Link
+                href={
+                  realData
+                    ? `/advisor?portfolio=${encodeURIComponent(realData.id)}`
+                    : "/advisor"
+                }
+              >
+                Ask AI advisor
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       {/* ── Demo data banner (only for anonymous visitors) ───────────── */}
       {isAnonymous && (
-        <div className="flex items-start gap-3 rounded-lg border border-muted bg-muted/30 p-3 text-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          <p className="text-muted-foreground">
-            You're viewing demo data.{" "}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border border-border-strong bg-surface px-3.5 py-2.5 text-[12.5px] text-muted-foreground">
+          <Badge variant="secondary">Sample</Badge>
+          <span>
+            These are illustrative positions.{" "}
             <Link
               href="/sign-up"
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               Create an account
             </Link>{" "}
-            to track your actual holdings and get AI-powered insights.
-          </p>
+            to run the same analysis against your own holdings.
+          </span>
         </div>
       )}
 
-      {/* ── Stat cards ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* ── Stat tiles ─────────────────────────────────────────────────── */}
+      <StatGrid>
         <StatCard
           label="Portfolio value"
           value={totalValue != null ? formatCurrency(totalValue) : "—"}
           delta={totalGainPct != null ? formatPercent(totalGainPct) : undefined}
-          trend={totalGain != null ? (totalGain >= 0 ? "up" : "down") : "neutral"}
+          trend={
+            totalGain != null ? (totalGain >= 0 ? "up" : "down") : "neutral"
+          }
           hint="vs. cost basis"
           icon={DollarSign}
+          spark={valueSpark}
         />
         <StatCard
           label="Total gain / loss"
           value={totalGain != null ? formatCurrency(totalGain) : "—"}
           delta={totalGainPct != null ? formatPercent(totalGainPct) : undefined}
-          trend={totalGain != null ? (totalGain >= 0 ? "up" : "down") : "neutral"}
+          trend={
+            totalGain != null ? (totalGain >= 0 ? "up" : "down") : "neutral"
+          }
           hint="unrealised"
+          valueTone="auto"
           icon={TrendingUp}
         />
         <StatCard
@@ -304,30 +370,140 @@ export default async function DashboardPage() {
           icon={Wallet}
         />
         <StatCard
-          label={biggestLoser ? "Biggest loser" : "Positions"}
-          value={
-            biggestLoser
-              ? `${biggestLoser.symbol} ${
-                  biggestLoser.unrealizedGainLoss != null
-                    ? formatCurrency(biggestLoser.unrealizedGainLoss)
-                    : ""
-                }`
-              : isAnonymous
-                ? "DEMO"
-                : "—"
-          }
+          label={biggestLoser ? "Weakest position" : "Positions"}
+          value={biggestLoser ? biggestLoser.symbol : isAnonymous ? "—" : "—"}
           delta={
-            biggestLoser?.unrealizedGainLossPct != null
-              ? formatPercent(biggestLoser.unrealizedGainLossPct)
+            biggestLoser?.gainPct != null
+              ? formatPercent(biggestLoser.gainPct)
               : undefined
           }
           trend={biggestLoser ? "down" : "neutral"}
-          hint={isAnonymous ? "demo data" : biggestLoser ? "unrealised" : ""}
+          hint={biggestLoser ? "unrealised" : ""}
+          valueTone="auto"
           icon={TrendingDown}
         />
+      </StatGrid>
+
+      {/* ── Risk + allocation ──────────────────────────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RiskScoreCard
+          result={riskScore}
+          showAdvisorLink={!isAnonymous}
+          compact={isAnonymous}
+          portfolioId={realData?.id}
+        />
+
+        <div className="border bg-surface p-5">
+          <h3 className="text-[13.5px] font-semibold">Allocation</h3>
+          <p className="mb-4 mt-0.5 text-[12px] text-muted-foreground">
+            By sector, weighted by market value
+          </p>
+          <SectorAllocationBar data={sectorAlloc} />
+        </div>
       </div>
 
-      {/* ── Future value (hypothetical) ───────────────────────────────── */}
+      {/* ── Holdings ───────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <SectionTitle
+          actions={
+            realData ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/portfolio/${realData.id}`}>Open portfolio</Link>
+              </Button>
+            ) : null
+          }
+        >
+          Holdings
+        </SectionTitle>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ticker</TableHead>
+              <TableHead>Sector</TableHead>
+              <TableHead className="text-right">Shares</TableHead>
+              <TableHead className="text-right">Avg cost</TableHead>
+              <TableHead className="text-right">Price</TableHead>
+              <TableHead className="text-right">Mkt value</TableHead>
+              <TableHead className="text-right">Gain / loss</TableHead>
+              <TableHead className="text-right">Weight</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.symbol}>
+                <TableCell>
+                  <div className="font-mono text-[13px] font-semibold">
+                    {r.symbol}
+                  </div>
+                  <div className="mt-px max-w-[220px] truncate text-[11.5px] text-faint">
+                    {r.name}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {r.sector ? (
+                    <span className="whitespace-nowrap rounded-md border bg-background px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
+                      {r.sector}
+                    </span>
+                  ) : (
+                    <span className="text-faint">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {r.quantity ?? "—"}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {r.averageCost != null ? formatCurrency(r.averageCost) : "—"}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {r.price != null ? formatCurrency(r.price) : "—"}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {r.marketValue != null ? formatCurrency(r.marketValue) : "—"}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "whitespace-nowrap text-right font-mono",
+                    r.gain != null && r.gain >= 0
+                      ? "text-success"
+                      : r.gain != null
+                        ? "text-destructive"
+                        : null,
+                  )}
+                >
+                  {r.gain != null ? (
+                    <>
+                      {r.gain >= 0 ? "+" : "−"}
+                      {formatCurrency(Math.abs(r.gain))}
+                      {r.gainPct != null ? (
+                        <span className="ml-1.5 text-[11px] text-faint">
+                          {formatPercent(r.gainPct)}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {r.weight != null ? formatPercent(r.weight, 1) : "—"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* ── Market pulse ───────────────────────────────────────────────── */}
+      {marketSnapshot ? (
+        <MarketToday snapshot={marketSnapshot} />
+      ) : (
+        <div className="border border-dashed p-8 text-center text-[12.5px] text-muted-foreground">
+          Market snapshot unavailable.
+        </div>
+      )}
+
+      {/* ── Projection ─────────────────────────────────────────────────── */}
       <FuturePortfolioProjection
         portfolioValue={totalValue}
         investmentGoal={investmentGoal}
@@ -335,164 +511,56 @@ export default async function DashboardPage() {
         isDemo={usingMock}
       />
 
-      {/* ── Risk vs profile ─────────────────────────────────────────────── */}
-      <RiskScoreCard
-        result={riskScore}
-        showAdvisorLink={!isAnonymous}
-        compact={isAnonymous}
-      />
-
-      {/* ── Market pulse + allocation ───────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          {marketSnapshot ? (
-            <MarketToday snapshot={marketSnapshot} />
-          ) : (
-            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-              Market snapshot unavailable.
+      {/* ── Highlights ─────────────────────────────────────────────────── */}
+      <div className="hairline-grid grid md:grid-cols-3">
+        {topConcentration ? (
+          <div className="p-5">
+            <div className="flex items-center gap-2">
+              <Badge variant="warning">Concentration</Badge>
+              <span className="font-mono text-[13px] font-semibold">
+                {topConcentration.symbol}
+              </span>
             </div>
-          )}
+            <p className="mt-2.5 text-[12.5px] leading-relaxed text-muted-foreground">
+              Largest single position at{" "}
+              {topConcentration.weight != null
+                ? formatPercent(topConcentration.weight, 1)
+                : "—"}{" "}
+              of the book. Anything above roughly a fifth starts to dominate the
+              portfolio&rsquo;s outcome on its own.
+            </p>
+          </div>
+        ) : null}
+
+        {sectorAlloc.length > 0 && totalValue ? (
+          <div className="p-5">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">Top sector</Badge>
+              <span className="text-[13px] font-semibold">
+                {sectorAlloc[0].name}
+              </span>
+            </div>
+            <p className="mt-2.5 text-[12.5px] leading-relaxed text-muted-foreground">
+              {formatPercent((sectorAlloc[0].value / totalValue) * 100, 1)} of
+              exposure sits in {sectorAlloc[0].name}; one macro shock moves all
+              of it at once.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="p-5">
+          <div className="flex items-center gap-2">
+            <Badge variant={isEnriched ? "success" : "outline"}>
+              {isEnriched ? "Live prices" : "No prices yet"}
+            </Badge>
+            <span className="text-[13px] font-semibold">Market data</span>
+          </div>
+          <p className="mt-2.5 text-[12.5px] leading-relaxed text-muted-foreground">
+            {isEnriched
+              ? "Pricing is current. Open the portfolio and refresh to pull the latest quotes."
+              : "Open your portfolio and choose “Refresh market data” to price the book."}
+          </p>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation</CardTitle>
-            <CardDescription>Exposure by sector.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {sectorAlloc.length > 0 ? (
-              <AllocationChart data={sectorAlloc} />
-            ) : (
-              <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
-                Refresh market data to see sector breakdown.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Bottom row ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Top movers */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Top gainers</CardTitle>
-              <CardDescription>Best unrealised positions.</CardDescription>
-            </div>
-            {realData && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/portfolio/${realData.id}`}>View all</Link>
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {topMovers.map((r) => (
-              <div
-                key={r.symbol}
-                className="flex items-center justify-between rounded-md border p-3"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{r.symbol}</span>
-                    {r.sector && (
-                      <Badge variant="outline" className="text-[10px]">
-                        {r.sector}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate max-w-[140px]">
-                    {r.name}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">
-                    {r.marketValue != null ? formatCurrency(r.marketValue) : "—"}
-                  </div>
-                  {r.gainPct != null && (
-                    <div
-                      className={
-                        r.gainPct >= 0
-                          ? "text-xs text-success"
-                          : "text-xs text-destructive"
-                      }
-                    >
-                      {r.gainPct >= 0 ? "+" : ""}
-                      {formatPercent(r.gainPct)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Summary insights */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Portfolio highlights</CardTitle>
-            <CardDescription>Key metrics at a glance.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {topConcentration && (
-              <div className="rounded-md border p-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="warning">Concentration</Badge>
-                  <span className="text-sm font-medium">{topConcentration.symbol}</span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Largest position at{" "}
-                  {topConcentration.weight != null
-                    ? formatPercent(topConcentration.weight * 100, 1)
-                    : "—"}{" "}
-                  of total portfolio value.
-                </p>
-              </div>
-            )}
-
-            {sectorAlloc.length > 0 && totalValue && (
-              <div className="rounded-md border p-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Top sector</Badge>
-                  <span className="text-sm font-medium">
-                    {sectorAlloc[0].name}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {formatPercent((sectorAlloc[0].value / totalValue) * 100, 1)} of
-                  your portfolio is in {sectorAlloc[0].name}.
-                </p>
-              </div>
-            )}
-
-            <div className="rounded-md border p-3">
-              <div className="flex items-center gap-2">
-                <Badge variant={isEnriched ? "success" : "outline"}>
-                  {isEnriched ? "Live prices" : "No prices yet"}
-                </Badge>
-                <span className="text-sm font-medium">Market data</span>
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {isEnriched
-                  ? "Prices refreshed. Open a portfolio and click Refresh to update."
-                  : "Open your portfolio page and click 'Refresh market data' to load live prices."}
-              </p>
-            </div>
-
-            {!isAnonymous && (
-              <div className="rounded-md border bg-primary/5 border-primary/20 p-3">
-                <div className="flex items-center gap-2">
-                  <Badge>AI ready</Badge>
-                  <span className="text-sm font-medium">Ask the advisor</span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Your portfolio is loaded. The AI advisor can analyse your
-                  holdings, risk profile, and suggest rebalancing ideas.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

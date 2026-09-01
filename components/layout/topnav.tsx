@@ -2,16 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Menu, Search, SquareTerminal } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { MarketStatusPill } from "@/components/layout/market-status-pill";
+import { BrandLockup } from "@/components/brand";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +18,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { clientEnv } from "@/lib/env";
+import { currentNavLabel } from "@/components/layout/nav-config";
+import { brandInitials } from "@/components/brand";
 
 type TopnavProps = {
   onOpenMobileNav?: () => void;
@@ -29,9 +28,15 @@ type TopnavProps = {
 export function Topnav({ onOpenMobileNav }: TopnavProps) {
   const pathname = usePathname();
   const beginNavigation = useBeginNavigation();
+  const section = currentNavLabel(pathname);
+
+  const navigateUnless = (prefix: string) => () => {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return;
+    beginNavigation();
+  };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:gap-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-[57px] items-center gap-3 border-b bg-surface px-4 md:px-8">
       <div className="flex min-w-0 items-center gap-2 md:hidden">
         <Button
           variant="ghost"
@@ -44,75 +49,60 @@ export function Topnav({ onOpenMobileNav }: TopnavProps) {
         </Button>
         <Link
           href="/dashboard"
-          onClick={() => {
-            if (pathname === "/dashboard") return;
-            beginNavigation();
-          }}
-          className="flex min-w-0 items-center gap-2"
+          onClick={navigateUnless("/dashboard")}
+          className="min-w-0"
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <SquareTerminal className="h-4 w-4" />
-          </div>
-          <span className="truncate text-sm font-semibold tracking-tight">
-            {clientEnv.NEXT_PUBLIC_APP_NAME}
-          </span>
+          <BrandLockup size="sm" />
         </Link>
       </div>
 
-      <div className="relative hidden flex-1 md:block md:max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search tickers, portfolios, reports..."
-          className="pl-9"
-        />
+      <div className="hidden text-[12.5px] text-faint md:block">
+        {clientEnv.NEXT_PUBLIC_APP_NAME}
+        {section ? (
+          <>
+            {" / "}
+            <span className="font-medium text-foreground">{section}</span>
+          </>
+        ) : null}
       </div>
 
-      <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <Button variant="ghost" size="icon" aria-label="Notifications">
-          <Bell className="h-4 w-4" />
-        </Button>
+      <div className="ml-auto flex items-center gap-2 md:gap-4">
+        <div className="relative hidden w-[280px] lg:block">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+          <input
+            placeholder="Search tickers, portfolios, reports"
+            className="h-[30px] w-full rounded-md border bg-background pl-8 pr-11 text-[12.5px] text-foreground placeholder:text-faint focus:border-primary focus:outline-none"
+          />
+          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border-strong bg-surface px-1.5 py-px font-mono text-[10.5px] text-faint">
+            ⌘K
+          </kbd>
+        </div>
+
+        <MarketStatusPill />
         <ThemeToggle />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Avatar className="h-9 w-9">
-                <AvatarImage src="" alt="" />
-                <AvatarFallback>T0</AvatarFallback>
+            <button
+              className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Account menu"
+            >
+              <Avatar className="h-7 w-7">
+                <AvatarFallback>{brandInitials()}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel>My account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link
-                href="/settings"
-                onClick={() => {
-                  if (
-                    pathname === "/settings" ||
-                    pathname.startsWith("/settings/")
-                  )
-                    return;
-                  beginNavigation();
-                }}
-              >
+              <Link href="/settings" onClick={navigateUnless("/settings")}>
                 Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link
-                href="/advisor"
-                onClick={() => {
-                  if (
-                    pathname === "/advisor" ||
-                    pathname.startsWith("/advisor/")
-                  )
-                    return;
-                  beginNavigation();
-                }}
-              >
-                AI Advisor
+              <Link href="/advisor" onClick={navigateUnless("/advisor")}>
+                AI advisor
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

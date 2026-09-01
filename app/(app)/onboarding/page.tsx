@@ -23,14 +23,15 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-background">
       <div className="container py-8 md:py-12">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+        <div className="mx-auto mb-6 max-w-2xl">
+          <h1 className="text-[24px] font-semibold tracking-tight">
             Welcome to {clientEnv.NEXT_PUBLIC_APP_NAME}
           </h1>
-          <p className="mt-2 text-muted-foreground">
-            Let's set up your investment profile in just a few steps
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            Set the mandate your analysis will be measured against. Seven short
+            steps.
           </p>
         </div>
 

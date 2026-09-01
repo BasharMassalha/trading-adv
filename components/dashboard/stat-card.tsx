@@ -1,5 +1,3 @@
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type StatCardProps = {
@@ -9,7 +7,48 @@ type StatCardProps = {
   trend?: "up" | "down" | "neutral";
   icon?: React.ComponentType<{ className?: string }>;
   hint?: string;
+  /**
+   * "auto" tints the figure itself with the trend colour. Reserve it for
+   * metrics that ARE a gain or loss — a portfolio total should stay neutral
+   * even when it is up.
+   */
+  valueTone?: "neutral" | "auto";
+  /** Optional normalised series (any scale) drawn as a baseline sparkline. */
+  spark?: number[];
 };
+
+function Sparkline({ points, trend }: { points: number[]; trend: string }) {
+  if (points.length < 2) return null;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const path = points
+    .map((p, i) => {
+      const x = (i / (points.length - 1)) * 160;
+      const y = 22 - ((p - min) / span) * 20;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      className="mt-2.5 w-full"
+      height="24"
+      viewBox="0 0 160 24"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <polyline
+        points={path}
+        fill="none"
+        strokeWidth="1.4"
+        className={
+          trend === "down" ? "stroke-destructive" : "stroke-success"
+        }
+      />
+    </svg>
+  );
+}
 
 export function StatCard({
   label,
@@ -18,8 +57,10 @@ export function StatCard({
   trend = "neutral",
   icon: Icon,
   hint,
+  valueTone = "neutral",
+  spark,
 }: StatCardProps) {
-  const deltaColor =
+  const tone =
     trend === "up"
       ? "text-success"
       : trend === "down"
@@ -27,35 +68,56 @@ export function StatCard({
         : "text-muted-foreground";
 
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{label}</span>
-          {Icon ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-              <Icon className="h-4 w-4 text-muted-foreground" />
-            </div>
+    <div className="bg-surface px-[18px] py-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] text-muted-foreground">{label}</span>
+        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-faint" /> : null}
+      </div>
+
+      <div
+        className={cn(
+          "mt-2.5 font-mono text-[21px] font-semibold leading-none tracking-tight",
+          valueTone === "auto" ? tone : null,
+        )}
+      >
+        {value}
+      </div>
+
+      {delta || hint ? (
+        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 text-[12px]">
+          {delta ? (
+            <span className={tone}>
+              {trend === "up" ? "▲ " : trend === "down" ? "▼ " : ""}
+              {delta}
+            </span>
           ) : null}
+          {hint ? <span className="text-faint">{hint}</span> : null}
         </div>
-        <div className="mt-4 text-2xl font-semibold tracking-tight">{value}</div>
-        {delta || hint ? (
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            {delta ? (
-              <span className={cn("inline-flex items-center gap-1", deltaColor)}>
-                {trend === "up" ? (
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                ) : trend === "down" ? (
-                  <ArrowDownRight className="h-3.5 w-3.5" />
-                ) : null}
-                {delta}
-              </span>
-            ) : null}
-            {hint ? (
-              <span className="text-muted-foreground">{hint}</span>
-            ) : null}
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      ) : null}
+
+      {spark && spark.length > 1 ? (
+        <Sparkline points={spark} trend={trend} />
+      ) : null}
+    </div>
+  );
+}
+
+/** Hairline-divided container the tiles are designed to sit in. */
+export function StatGrid({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "hairline-grid grid sm:grid-cols-2 xl:grid-cols-4",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }

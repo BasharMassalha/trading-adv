@@ -39,42 +39,46 @@ type Props = {
 
 type TtsState = "unknown" | "neural" | "fallback";
 
+/**
+ * Tone keys map to semantic tokens: `glow` tints the scene marker, `ring` sets
+ * its icon colour, `chip` styles the scene badge.
+ */
 function tonePalette(tone: BriefingTone | undefined) {
   switch (tone) {
     case "positive":
       return {
-        glow: "from-emerald-500/25 via-emerald-500/0 to-emerald-500/0",
-        ring: "ring-emerald-500/40",
-        chip: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+        glow: "bg-success-soft",
+        ring: "text-success",
+        chip: "border-transparent bg-success-soft text-success",
         icon: TrendingUp,
       };
     case "negative":
       return {
-        glow: "from-rose-500/25 via-rose-500/0 to-rose-500/0",
-        ring: "ring-rose-500/40",
-        chip: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+        glow: "bg-destructive-soft",
+        ring: "text-destructive",
+        chip: "border-transparent bg-destructive-soft text-destructive",
         icon: ShieldAlert,
       };
     case "warning":
       return {
-        glow: "from-amber-500/25 via-amber-500/0 to-amber-500/0",
-        ring: "ring-amber-500/40",
-        chip: "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
+        glow: "bg-warning-soft",
+        ring: "text-warning",
+        chip: "border-transparent bg-warning-soft text-warning",
         icon: ShieldAlert,
       };
     case "info":
       return {
-        glow: "from-sky-500/25 via-sky-500/0 to-sky-500/0",
-        ring: "ring-sky-500/40",
-        chip: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
+        glow: "bg-primary-soft",
+        ring: "text-primary",
+        chip: "border-transparent bg-primary-soft text-primary",
         icon: Lightbulb,
       };
     case "neutral":
     default:
       return {
-        glow: "from-primary/20 via-primary/0 to-primary/0",
-        ring: "ring-primary/30",
-        chip: "bg-primary/10 text-primary border-primary/30",
+        glow: "bg-muted",
+        ring: "text-muted-foreground",
+        chip: "border-border bg-background text-muted-foreground",
         icon: Target,
       };
   }
@@ -307,13 +311,13 @@ export function BriefingPlayer({
   if (!briefing || scenes.length === 0) {
     return (
       <Overlay onClose={onClose}>
-        <div className="rounded-2xl border bg-card p-8 text-center shadow-2xl">
-          <Film className="mx-auto mb-3 h-8 w-8 text-primary" />
-          <p className="font-semibold">No briefing available yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Generate (or regenerate) an analysis to unlock the video briefing.
+        <div className="border bg-surface p-8 text-center shadow-pop">
+          <Film className="mx-auto mb-3 h-5 w-5 stroke-[1.6] text-faint" />
+          <p className="text-[14px] font-semibold">No briefing available yet</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            Generate or regenerate an analysis to unlock the briefing.
           </p>
-          <Button onClick={onClose} className="mt-5">
+          <Button onClick={onClose} variant="outline" className="mt-5">
             Close
           </Button>
         </div>
@@ -330,37 +334,34 @@ export function BriefingPlayer({
   return (
     <Overlay onClose={onClose}>
       <audio ref={audioElRef} hidden />
-      <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <div className="flex w-full max-w-3xl flex-col overflow-hidden border bg-surface shadow-pop">
         {/* Top bar */}
-        <div className="flex items-center justify-between gap-2 border-b px-5 py-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Film className="h-3.5 w-3.5 text-primary" />
-            <span>Video briefing</span>
-            <span className="mx-2">·</span>
-            <span>
+        <div className="flex items-center justify-between gap-2 border-b px-5 py-2.5">
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+            <Film className="h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+            <span>Briefing</span>
+            <span className="text-faint">·</span>
+            <span className="font-mono">
               {idx + 1} / {scenes.length}
             </span>
             {ttsState === "neural" && (
-              <span className="ml-2 hidden items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary sm:inline-flex">
-                <Sparkles className="h-2.5 w-2.5" />
+              <span className="ml-1 hidden items-center gap-1 rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
+                <Sparkles className="h-3 w-3 stroke-[1.6]" />
                 Neural voice
               </span>
             )}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 stroke-[1.6]" />
           </Button>
         </div>
 
         {/* Segmented progress */}
         <div className="flex gap-1 px-5 pt-3">
           {scenes.map((s, i) => (
-            <div
-              key={s.id}
-              className="h-1 flex-1 overflow-hidden rounded-full bg-muted-foreground/20"
-            >
+            <div key={s.id} className="h-1 flex-1 overflow-hidden bg-border">
               <div
-                className="h-full rounded-full bg-primary"
+                className="h-full bg-primary"
                 style={{
                   width:
                     i < idx
@@ -375,21 +376,12 @@ export function BriefingPlayer({
         </div>
 
         {/* Scene stage */}
-        <div className="relative min-h-[22rem] overflow-hidden p-6 sm:p-10">
-          {/* Moving ambient background */}
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-0 bg-gradient-to-br",
-              palette.glow,
-            )}
-          />
-          <div className="briefing-pan pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-from),_transparent_55%)] opacity-70" />
-
+        <div className="relative min-h-[22rem] p-6 sm:p-10">
           {loading && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card/60 backdrop-blur-sm">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Preparing your narrator…
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface/90">
+              <Loader2 className="h-5 w-5 animate-spin stroke-[1.6] text-faint" />
+              <p className="text-[12.5px] text-muted-foreground">
+                Preparing narration…
               </p>
             </div>
           )}
@@ -398,26 +390,26 @@ export function BriefingPlayer({
             <div className="briefing-rise flex items-center gap-3">
               <div
                 className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-xl border bg-background/70 ring-2 backdrop-blur",
-                  palette.ring,
+                  "flex h-11 w-11 shrink-0 items-center justify-center border",
+                  palette.glow,
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className={cn("h-5 w-5 stroke-[1.6]", palette.ring)} />
               </div>
               <div className="min-w-0">
                 {scene.subtitle && (
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[11px] uppercase tracking-wide text-faint">
                     {scene.subtitle}
                   </p>
                 )}
-                <h2 className="truncate text-2xl font-semibold tracking-tight">
+                <h2 className="truncate text-[26px] font-semibold leading-tight tracking-tight">
                   {scene.title}
                 </h2>
               </div>
               {scene.badge && (
                 <span
                   className={cn(
-                    "ml-auto inline-flex items-center gap-1.5 self-start rounded-full border px-2.5 py-1 text-xs font-semibold",
+                    "ml-auto inline-flex items-center gap-1.5 self-start rounded-md border px-2 py-0.5 text-[11px] font-medium",
                     palette.chip,
                   )}
                 >
@@ -426,23 +418,23 @@ export function BriefingPlayer({
               )}
               {speaking && (
                 <span className="ml-1 flex items-end gap-0.5 self-center" aria-hidden>
-                  <i className="briefing-eq h-3 w-0.5 rounded-full bg-primary" style={{ animationDelay: "0ms" }} />
-                  <i className="briefing-eq h-4 w-0.5 rounded-full bg-primary" style={{ animationDelay: "150ms" }} />
-                  <i className="briefing-eq h-2.5 w-0.5 rounded-full bg-primary" style={{ animationDelay: "300ms" }} />
+                  <i className="briefing-eq h-3 w-0.5 bg-primary" style={{ animationDelay: "0ms" }} />
+                  <i className="briefing-eq h-4 w-0.5 bg-primary" style={{ animationDelay: "150ms" }} />
+                  <i className="briefing-eq h-2.5 w-0.5 bg-primary" style={{ animationDelay: "300ms" }} />
                 </span>
               )}
             </div>
 
             {scene.bullets && scene.bullets.length > 0 && (
-              <ul className="space-y-3">
+              <ul className="space-y-2">
                 {scene.bullets.map((b, i) => (
                   <li
                     key={i}
-                    className="briefing-rise flex gap-3 rounded-lg border bg-background/60 p-3 text-sm leading-relaxed backdrop-blur"
+                    className="briefing-rise flex gap-3 border bg-background p-3.5 text-[14px] leading-relaxed"
                     style={{ animationDelay: `${150 + i * 130}ms` }}
                   >
-                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span className="text-foreground/90">{b}</span>
+                    <span className="mt-[9px] h-1 w-1 shrink-0 bg-faint" />
+                    <span>{b}</span>
                   </li>
                 ))}
               </ul>
@@ -451,8 +443,8 @@ export function BriefingPlayer({
         </div>
 
         {/* Captions */}
-        <div className="border-t bg-muted/30 px-5 py-3">
-          <p className="briefing-fade text-center text-sm leading-relaxed text-foreground/80">
+        <div className="border-t bg-background px-5 py-3">
+          <p className="briefing-fade text-center text-[13px] leading-relaxed text-muted-foreground">
             {scene.narration}
           </p>
         </div>
@@ -466,7 +458,7 @@ export function BriefingPlayer({
             disabled={idx === 0}
             className="gap-1.5"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 stroke-[1.6]" />
             Prev
           </Button>
 
@@ -480,7 +472,7 @@ export function BriefingPlayer({
               }}
               title="Restart"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4 stroke-[1.6]" />
             </Button>
             <Button
               size="icon"
@@ -495,9 +487,9 @@ export function BriefingPlayer({
               title={playing ? "Pause" : "Play"}
             >
               {playing ? (
-                <Pause className="h-4 w-4" />
+                <Pause className="h-4 w-4 stroke-[1.6]" />
               ) : (
-                <Play className="h-4 w-4" />
+                <Play className="h-4 w-4 stroke-[1.6]" />
               )}
             </Button>
             <Button
@@ -507,9 +499,9 @@ export function BriefingPlayer({
               title={muted ? "Unmute narration" : "Mute narration"}
             >
               {muted ? (
-                <VolumeX className="h-4 w-4" />
+                <VolumeX className="h-4 w-4 stroke-[1.6]" />
               ) : (
-                <Volume2 className="h-4 w-4" />
+                <Volume2 className="h-4 w-4 stroke-[1.6]" />
               )}
             </Button>
           </div>
@@ -521,7 +513,7 @@ export function BriefingPlayer({
             className="gap-1.5"
           >
             Next
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 stroke-[1.6]" />
           </Button>
         </div>
       </div>
@@ -538,7 +530,7 @@ function Overlay({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-background/80 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >

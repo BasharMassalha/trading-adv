@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Users, Info } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Users, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { PageHeader, SectionTitle } from "@/components/layout/page-header";
+import { StatCard, StatGrid } from "@/components/dashboard/stat-card";
 import { ConsensusTable } from "@/components/superinvestors/consensus-table";
 import { superinvestorsService } from "@/server/services/superinvestors.service";
 import { formatCurrency } from "@/lib/utils";
@@ -25,39 +19,31 @@ export default async function SuperinvestorsPage() {
   const snapshot = await superinvestorsService.getSnapshot(3);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Superinvestors
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Live 13F holdings from SEC EDGAR for{" "}
-            {snapshot.investors.length} well-known investors — plus consensus
-            longs and disclosed put options only.
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Badge variant="secondary" className="text-[10px]">
+    <div className="space-y-5">
+      <PageHeader
+        title="Superinvestors"
+        description={`Live 13F holdings from SEC EDGAR for ${snapshot.investors.length} well-known investors, plus consensus longs and disclosed put options only.`}
+        actions={
+          <>
+            <Badge variant="secondary">
               Latest period {snapshot.asOfLabel}
             </Badge>
-            <Badge variant="outline" className="text-[10px]">
-              SEC 13F · ~45-day lag
+            <Badge variant="outline">SEC 13F · ~45-day lag</Badge>
+            <Badge variant="outline">
+              <span className="font-mono">
+                {snapshot.liveCount}/{snapshot.investors.length}
+              </span>{" "}
+              live
             </Badge>
-            <Badge variant="outline" className="text-[10px]">
-              {snapshot.liveCount}/{snapshot.investors.length} live
-            </Badge>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <Card className="border-amber-500/30 bg-amber-500/5">
-        <CardContent className="flex gap-3 p-4 text-sm text-muted-foreground">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <p>{snapshot.disclaimer}</p>
-        </CardContent>
-      </Card>
+      <p className="border border-warning/30 bg-warning-soft px-4 py-3 text-[12.5px] leading-relaxed text-warning">
+        {snapshot.disclaimer}
+      </p>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatGrid>
         <StatCard
           label="Investors tracked"
           value={String(snapshot.investors.length)}
@@ -69,105 +55,113 @@ export default async function SuperinvestorsPage() {
           value={String(snapshot.consensusLongs.length)}
           hint="Held by 3+ managers"
           trend="up"
+          icon={TrendingUp}
         />
         <StatCard
           label="Consensus puts"
           value={String(snapshot.consensusShorts.length)}
           hint="Disclosed 13F puts only"
           trend="down"
+          icon={TrendingDown}
         />
         <StatCard
           label="Fetch issues"
           value={String(snapshot.failedCount)}
           hint="Unavailable this refresh"
+          icon={AlertTriangle}
+        />
+      </StatGrid>
+
+      {/* ── Consensus ────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div>
+          <SectionTitle>Shared ideas</SectionTitle>
+          <p className="mt-1 max-w-3xl text-[12.5px] leading-relaxed text-muted-foreground">
+            Overlap across live 13F books. Put consensus only includes options
+            actually disclosed in filings. Most hedge-fund short books stay
+            private and are never shown here.
+          </p>
+        </div>
+
+        <ConsensusTable
+          title="Consensus longs"
+          description="Tickers appearing in at least three long books."
+          positions={snapshot.consensusLongs}
+          emptyHint="No long overlap at the current threshold (or tickers still resolving)."
+          tone="long"
+        />
+        <ConsensusTable
+          title="Consensus puts"
+          description="Put-option tickers shared by at least three managers."
+          positions={snapshot.consensusShorts}
+          emptyHint="No shared put tickers. Expected, since most shorts are not in 13F."
+          tone="short"
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Shared ideas</CardTitle>
-          <CardDescription>
-            Overlap across live 13F books. Put consensus only includes options
-            actually disclosed in filings — most hedge-fund short books stay
-            private and are never shown here.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <ConsensusTable
-            title="Consensus longs"
-            description="Tickers appearing in at least three long books."
-            positions={snapshot.consensusLongs}
-            emptyHint="No long overlap at the current threshold (or tickers still resolving)."
-            tone="long"
-          />
-          <ConsensusTable
-            title="Consensus puts"
-            description="Put-option tickers shared by at least three managers."
-            positions={snapshot.consensusShorts}
-            emptyHint="No shared put tickers — expected, since most shorts are not in 13F."
-            tone="short"
-          />
-        </CardContent>
-      </Card>
+      {/* ── Investor directory ───────────────────────────────────────── */}
+      <div className="space-y-3">
+        <SectionTitle>All investors</SectionTitle>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">
-          All investors
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="hairline-grid grid md:grid-cols-2 xl:grid-cols-3">
           {snapshot.investors.map((inv) => (
             <Link
               key={inv.id}
               href={`/superinvestors/${inv.id}`}
-              className="group"
+              className="flex flex-col p-5 transition-colors hover:bg-background"
             >
-              <Card className="h-full transition-shadow group-hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">{inv.name}</CardTitle>
-                    <Badge
-                      variant={
-                        inv.holdingsSource === "sec-13f"
-                          ? "default"
-                          : "secondary"
-                      }
-                      className="shrink-0 text-[10px]"
-                    >
-                      {inv.holdingsSource === "sec-13f"
-                        ? inv.asOfQuarter
-                        : inv.holdingsSource === "unavailable"
-                          ? "Fetch failed"
-                          : "No 13F"}
-                    </Badge>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold tracking-tight">
+                    {inv.name}
                   </div>
-                  <CardDescription>{inv.firm}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="line-clamp-2 text-sm text-muted-foreground">
-                    {inv.style}
-                  </p>
-                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <span>{inv.longs.length} longs shown</span>
+                  <div className="mt-0.5 text-[12px] text-muted-foreground">
+                    {inv.firm}
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    inv.holdingsSource === "sec-13f" ? "info" : "secondary"
+                  }
+                  className="shrink-0"
+                >
+                  {inv.holdingsSource === "sec-13f"
+                    ? inv.asOfQuarter
+                    : inv.holdingsSource === "unavailable"
+                      ? "Fetch failed"
+                      : "No 13F"}
+                </Badge>
+              </div>
+
+              <p className="mt-2.5 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">
+                {inv.style}
+              </p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-faint">
+                <span>
+                  <span className="font-mono">{inv.longs.length}</span> longs
+                  shown
+                </span>
+                <span>·</span>
+                <span>
+                  <span className="font-mono">{inv.shorts.length}</span> put
+                  {inv.shorts.length === 1 ? "" : "s"}
+                </span>
+                {inv.bookValueUsdM != null ? (
+                  <>
                     <span>·</span>
                     <span>
-                      {inv.shorts.length} put
-                      {inv.shorts.length === 1 ? "" : "s"}
+                      <span className="font-mono">
+                        {formatCurrency(inv.bookValueUsdM * 1_000_000).replace(
+                          /\.\d+$/,
+                          "",
+                        )}
+                      </span>{" "}
+                      13F book
                     </span>
-                    {inv.bookValueUsdM != null ? (
-                      <>
-                        <span>·</span>
-                        <span>
-                          {formatCurrency(inv.bookValueUsdM * 1_000_000).replace(
-                            /\.\d+$/,
-                            "",
-                          )}{" "}
-                          13F book
-                        </span>
-                      </>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
+                  </>
+                ) : null}
+              </div>
             </Link>
           ))}
         </div>

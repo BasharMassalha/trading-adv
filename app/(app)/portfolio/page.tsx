@@ -3,18 +3,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/layout/page-header";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { getSession } from "@/lib/auth";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
 import { EmptyPortfolioList } from "@/components/empty-states";
+import { RenamePortfolioButton } from "./[id]/rename-portfolio-button";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Portfolios" };
@@ -43,34 +38,32 @@ export default async function PortfolioListPage() {
   const portfolios = await portfolioRepository.listByUser(session.userId);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Portfolios</h1>
-          <p className="text-sm text-muted-foreground">
-            All your tracked portfolios in one place.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/portfolio/upload">
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/portfolio/upload">
-              <Plus className="mr-2 h-4 w-4" />
-              New portfolio
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Portfolios"
+        description="Every book you track, with its latest valuation."
+        actions={
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/portfolio/upload">
+                <Upload className="h-3.5 w-3.5 stroke-[1.6]" />
+                Import
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/portfolio/upload">
+                <Plus className="h-3.5 w-3.5 stroke-[1.6]" />
+                New portfolio
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       {portfolios.length === 0 ? (
         <EmptyPortfolioList />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {portfolios.map((p) => {
             const totalValue = p.totalValue ? Number(p.totalValue) : null;
             const totalCost = p.totalCost ? Number(p.totalCost) : null;
@@ -84,58 +77,72 @@ export default async function PortfolioListPage() {
             const trend = totalGain != null ? (totalGain >= 0 ? "up" : "down") : null;
 
             return (
-              <Link key={p.id} href={`/portfolio/${p.id}`} className="group">
-                <Card className="transition-shadow group-hover:shadow-md">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">
-                        {p.name || "My Portfolio"}
-                      </CardTitle>
-                      <Badge variant="secondary" className="text-[10px]">
-                        {p.source || "CSV"}
-                      </Badge>
-                    </div>
-                    <CardDescription>
-                      {p._count?.holdings ?? 0} holdings &middot; updated{" "}
+              <div
+                key={p.id}
+                className="border bg-surface p-4 transition-colors hover:bg-background"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/portfolio/${p.id}`} className="min-w-0 flex-1">
+                    <h2 className="truncate text-[13.5px] font-semibold tracking-tight">
+                      {p.name || "My Portfolio"}
+                    </h2>
+                  </Link>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <RenamePortfolioButton
+                      portfolioId={p.id}
+                      portfolioName={p.name || "My Portfolio"}
+                      compact
+                    />
+                    <Badge variant="secondary">{p.source || "CSV"}</Badge>
+                  </div>
+                </div>
+
+                <Link href={`/portfolio/${p.id}`} className="mt-1 block">
+                  <p className="text-[12px] text-faint">
+                    <span className="font-mono">{p._count?.holdings ?? 0}</span>{" "}
+                    holdings &middot; updated{" "}
+                    <span className="font-mono">
                       {formatRelativeDate(p.updatedAt)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-semibold">
-                      {totalValue != null ? formatCurrency(totalValue) : "—"}
+                    </span>
+                  </p>
+
+                  <div className="mt-4 font-mono text-[21px] font-semibold leading-none tracking-tight">
+                    {totalValue != null ? formatCurrency(totalValue) : "—"}
+                  </div>
+
+                  {gainPct != null && trend ? (
+                    <div
+                      className={
+                        trend === "up"
+                          ? "mt-2 font-mono text-[12px] text-success"
+                          : "mt-2 font-mono text-[12px] text-destructive"
+                      }
+                    >
+                      {trend === "up" ? "+" : ""}
+                      {formatPercent(gainPct)}
+                      <span className="ml-1.5 font-sans text-faint">
+                        all time
+                      </span>
                     </div>
-                    {gainPct != null && trend ? (
-                      <div
-                        className={
-                          trend === "up"
-                            ? "mt-1 text-sm text-success"
-                            : "mt-1 text-sm text-destructive"
-                        }
-                      >
-                        {trend === "up" ? "+" : ""}
-                        {formatPercent(gainPct)} all time
-                      </div>
-                    ) : (
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        Refresh market data for performance
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
+                  ) : (
+                    <div className="mt-2 text-[12px] text-muted-foreground">
+                      Refresh market data for performance
+                    </div>
+                  )}
+                </Link>
+              </div>
             );
           })}
 
-          <Link href="/portfolio/upload">
-            <Card className="flex h-full min-h-[180px] cursor-pointer flex-col items-center justify-center gap-3 border-dashed p-8 text-center transition-colors hover:bg-muted/30">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                <Plus className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium">Add portfolio</p>
-              <p className="text-xs text-muted-foreground">
-                Upload CSV or screenshot
-              </p>
-            </Card>
+          <Link
+            href="/portfolio/upload"
+            className="flex h-full min-h-[160px] flex-col items-center justify-center gap-2 border border-dashed bg-surface p-8 text-center transition-colors hover:bg-background"
+          >
+            <Plus className="h-4 w-4 stroke-[1.6] text-faint" />
+            <p className="text-[13px] font-medium">Add portfolio</p>
+            <p className="text-[12px] text-muted-foreground">
+              Upload a broker CSV or screenshot
+            </p>
           </Link>
         </div>
       )}

@@ -1,40 +1,28 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  regimeToneClasses,
-  scoreToHsl,
-  scoreToSoftHsl,
-} from "./risk-style-utils";
+import { regimeToneClasses, scoreToHsl } from "./risk-style-utils";
 import type { RiskIndicator } from "@/lib/market-risk/types";
 
 function TrendIcon({ trend }: { trend: RiskIndicator["trend"] }) {
   if (trend === "rising")
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-500">
-        <ArrowUpRight className="h-3.5 w-3.5" />
+      <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-destructive">
+        <ArrowUpRight className="h-3.5 w-3.5 stroke-[1.6]" />
         rising
       </span>
     );
   if (trend === "falling")
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500">
-        <ArrowDownRight className="h-3.5 w-3.5" />
+      <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-success">
+        <ArrowDownRight className="h-3.5 w-3.5 stroke-[1.6]" />
         falling
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-      <ArrowRight className="h-3.5 w-3.5" />
+    <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-muted-foreground">
+      <ArrowRight className="h-3.5 w-3.5 stroke-[1.6]" />
       stable
     </span>
   );
@@ -43,57 +31,49 @@ function TrendIcon({ trend }: { trend: RiskIndicator["trend"] }) {
 function IndicatorCard({ indicator }: { indicator: RiskIndicator }) {
   const tone = regimeToneClasses(indicator.status);
   const accent = scoreToHsl(indicator.score);
-  const fillSoft = scoreToSoftHsl(indicator.score, 0.18);
 
   return (
-    <Card
-      className={cn(
-        "h-full border transition-shadow hover:shadow-md",
-        tone.border,
-      )}
-    >
-      <CardContent className="space-y-3 p-5">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              {indicator.label}
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span
-                className="text-3xl font-semibold tabular-nums"
-                style={{ color: accent }}
-              >
-                {indicator.score}
-              </span>
-              <span className="text-xs text-muted-foreground">/ 100</span>
-            </div>
-          </div>
-          <Badge variant="outline" className={cn("border text-[10px]", tone.badge)}>
-            {indicator.status}
-          </Badge>
-        </div>
+    <div className="flex h-full flex-col px-[18px] py-4">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-faint">
+          {indicator.label}
+        </span>
+        <span
+          className={cn(
+            "shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium",
+            tone.badge,
+          )}
+        >
+          {indicator.status}
+        </span>
+      </div>
 
-        {/* Mini bar */}
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="absolute inset-y-0 left-0 rounded-full"
-            style={{
-              width: `${indicator.score}%`,
-              background: accent,
-              boxShadow: `0 0 8px ${fillSoft}`,
-            }}
-          />
-        </div>
+      <div className="mt-2.5 flex items-baseline gap-1.5">
+        <span
+          className="font-mono text-[21px] font-semibold leading-none tracking-tight"
+          style={{ color: accent }}
+        >
+          {indicator.score}
+        </span>
+        <span className="font-mono text-[11px] text-faint">/ 100</span>
+      </div>
 
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          {indicator.explanation}
-        </p>
+      {/* Score track */}
+      <div className="mt-2.5 h-1 w-full bg-border">
+        <div
+          className="h-full"
+          style={{ width: `${indicator.score}%`, background: accent }}
+        />
+      </div>
 
-        <div className="pt-1">
-          <TrendIcon trend={indicator.trend} />
-        </div>
-      </CardContent>
-    </Card>
+      <p className="mt-2.5 text-[12px] leading-relaxed text-muted-foreground">
+        {indicator.explanation}
+      </p>
+
+      <div className="mt-auto pt-2.5">
+        <TrendIcon trend={indicator.trend} />
+      </div>
+    </div>
   );
 }
 
@@ -103,27 +83,30 @@ export function IndicatorBreakdown({
   indicators: RiskIndicator[];
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Indicator breakdown</CardTitle>
-        <CardDescription>
+    <div className="border bg-surface">
+      <div className="border-b px-5 py-3.5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight">
+          Indicator breakdown
+        </h2>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
           How each input contributes to the overall risk score. These are
-          components of a risk indicator — not individual forecasts.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {indicators.length === 0 ? (
-          <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+          components of a risk indicator, not individual forecasts.
+        </p>
+      </div>
+
+      {indicators.length === 0 ? (
+        <div className="p-5">
+          <div className="border border-dashed bg-surface p-8 text-center text-[13px] text-muted-foreground">
             No indicator data available yet.
           </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {indicators.map((ind) => (
-              <IndicatorCard key={ind.key} indicator={ind} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      ) : (
+        <div className="hairline-grid grid border-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {indicators.map((ind) => (
+            <IndicatorCard key={ind.key} indicator={ind} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

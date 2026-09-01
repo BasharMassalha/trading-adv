@@ -35,7 +35,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topnav onOpenMobileNav={() => setMobileNavOpen(true)} />
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 px-4 pb-16 pt-5 md:px-8 md:pb-[70px] md:pt-[26px]">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -53,7 +53,7 @@ export function DeletePortfolioButton({
       disabled={busy}
       onClick={handleDelete}
       className={cn(
-        "border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive",
+        "border-destructive/30 text-destructive hover:bg-destructive-soft hover:text-destructive",
         className,
       )}
     >
@@ -62,7 +62,7 @@ export function DeletePortfolioButton({
       ) : (
         <Trash2 className="h-3.5 w-3.5" />
       )}
-      <span className="ml-1.5">Delete</span>
+      Delete
     </Button>
   );
 }

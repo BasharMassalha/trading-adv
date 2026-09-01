@@ -6,7 +6,7 @@
  * and client code without circular imports.
  *
  * This file re-exports what other parts of the codebase still import from
- * here, and adds the createPortfolio schema.
+ * here, and adds portfolio mutation schemas.
  */
 
 export {
@@ -31,3 +31,11 @@ export const createPortfolioSchema = z.object({
   holdings: z.array(parsedHoldingSchema).default([]),
 });
 export type CreatePortfolioInput = z.infer<typeof createPortfolioSchema>;
+
+export const renamePortfolioSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Portfolio name is required")
+    .max(80, "Name is too long"),
+});

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ParseResult } from "@/lib/portfolio/parsed-holding";
+import { PageHeader } from "@/components/layout/page-header";
 import { UploadTabs } from "./upload-tabs";
 import { ImportReview } from "./import-review";
 
@@ -35,16 +36,11 @@ export function UploadOrchestrator() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Import portfolio
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload a broker CSV export or a screenshot of your holdings. We'll
-          parse them automatically so you can review before saving.
-        </p>
-      </div>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <PageHeader
+        title="Import portfolio"
+        description="Upload a broker CSV export or a screenshot of your holdings. We parse them automatically so you can review every row before saving."
+      />
       <UploadTabs
         onParsed={(result) => setStep({ type: "review", result })}
       />

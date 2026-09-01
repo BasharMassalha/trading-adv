@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { PageHeader, SectionTitle } from "@/components/layout/page-header";
+import { StatCard, StatGrid } from "@/components/dashboard/stat-card";
 import { AllocationChart } from "@/components/charts/allocation-chart";
 import { PerformanceComparisonChart } from "@/components/charts/performance-comparison-chart";
 import {
@@ -44,6 +45,7 @@ import { getSession } from "@/lib/auth";
 import { EmptyPortfolioDetail } from "@/components/empty-states";
 import { EnrichButton } from "./enrich-button";
 import { DeletePortfolioButton } from "./delete-portfolio-button";
+import { RenamePortfolioButton } from "./rename-portfolio-button";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Portfolio" };
@@ -103,57 +105,66 @@ export default async function PortfolioViewPage({
   )[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start gap-4">
-        <Button variant="ghost" size="sm" asChild className="shrink-0">
-          <Link href="/dashboard">
-            <ArrowLeft className="mr-1 h-4 w-4" />
+      <PageHeader
+        eyebrow={
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-3 w-3" />
             Dashboard
           </Link>
-        </Button>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{view.name}</h1>
-          <p className="text-xs text-muted-foreground">
-            ID: {params.id} · Source: {view.source} · {view.baseCurrency}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/portfolio/upload">Re-import</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/advisor">
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              AI advisor
-            </Link>
-          </Button>
-          <DeletePortfolioButton portfolioId={params.id} portfolioName={view.name} />
-          <EnrichButton
-            portfolioId={params.id}
-            lastEnrichedAt={view.lastEnrichedAt}
-          />
-        </div>
-      </div>
+        }
+        title={view.name}
+        description={
+          <span className="font-mono text-[11.5px] text-faint">
+            ID {params.id} · Source {view.source} · {view.baseCurrency}
+          </span>
+        }
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/portfolio/upload">Re-import</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={`/advisor?portfolio=${encodeURIComponent(params.id)}`}>
+                <Sparkles className="h-3.5 w-3.5" />
+                AI advisor
+              </Link>
+            </Button>
+            <RenamePortfolioButton
+              portfolioId={params.id}
+              portfolioName={view.name}
+            />
+            <DeletePortfolioButton portfolioId={params.id} portfolioName={view.name} />
+            <EnrichButton
+              portfolioId={params.id}
+              lastEnrichedAt={view.lastEnrichedAt}
+            />
+          </>
+        }
+      />
 
       {/* ── Needs enrichment banner ────────────────────────────────────── */}
       {needsEnrichment && (
-        <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/5 p-4 text-sm">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+        <div className="flex items-start gap-2.5 border border-warning/30 bg-warning-soft px-3.5 py-3 text-[12.5px]">
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
           <div>
             <p className="font-medium text-warning">
               Market data not yet loaded
             </p>
-            <p className="mt-1 text-muted-foreground">
-              Click "Refresh market data" above to fetch live prices,
+            <p className="mt-1 leading-relaxed text-muted-foreground">
+              Choose &ldquo;Refresh market data&rdquo; above to fetch live prices,
               sector data, and 1-year price history for all your holdings.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Stat cards ─────────────────────────────────────────────────── */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* ── Stat tiles ─────────────────────────────────────────────────── */}
+      <StatGrid>
         <StatCard
           label="Portfolio value"
           value={view.totalValue != null ? formatCurrency(view.totalValue) : "—"}
@@ -167,6 +178,7 @@ export default async function PortfolioViewPage({
           value={view.totalGain != null ? formatCurrency(view.totalGain) : "—"}
           delta={view.totalGainPct != null ? formatPercent(view.totalGainPct) : undefined}
           trend={view.totalGain != null ? (view.totalGain >= 0 ? "up" : "down") : "neutral"}
+          valueTone="auto"
           icon={TrendingUp}
         />
         <StatCard
@@ -189,11 +201,11 @@ export default async function PortfolioViewPage({
           }
           icon={PieChart}
         />
-      </div>
+      </StatGrid>
 
       {/* ── Risk score ─────────────────────────────────────────────────── */}
       {isEnriched && view.holdings.length > 0 && (
-        <RiskScoreCard result={riskScore} />
+        <RiskScoreCard result={riskScore} portfolioId={params.id} />
       )}
 
       {/* ── Tabbed detail ──────────────────────────────────────────────── */}
@@ -205,52 +217,50 @@ export default async function PortfolioViewPage({
         </TabsList>
 
         {/* Holdings table */}
-        <TabsContent value="holdings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Holdings</CardTitle>
-              <CardDescription>
-                All positions sorted by market value.
-                {!isEnriched && (
-                  <span className="ml-1 text-warning">
-                    Prices not yet loaded — refresh to see live values.
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="overflow-x-auto p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-6">Ticker</TableHead>
-                    <TableHead className="hidden md:table-cell">Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Sector</TableHead>
-                    <TableHead className="text-right">Shares</TableHead>
-                    <TableHead className="text-right">Avg Cost</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                    <TableHead className="text-right">Mkt Value</TableHead>
-                    <TableHead className="text-right">Gain / Loss</TableHead>
-                    <TableHead className="text-right hidden xl:table-cell">
-                      Weight
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {view.holdings.map((h) => (
-                    <HoldingRow key={h.id} holding={h} />
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="holdings" className="space-y-3">
+          <div className="space-y-1">
+            <SectionTitle>Holdings</SectionTitle>
+            <p className="text-[12px] text-muted-foreground">
+              All positions sorted by market value.
+              {!isEnriched && (
+                <span className="ml-1 text-warning">
+                  Prices not yet loaded. Refresh to see live values.
+                </span>
+              )}
+            </p>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ticker</TableHead>
+                <TableHead className="hidden md:table-cell">Sector</TableHead>
+                <TableHead className="text-right">Shares</TableHead>
+                <TableHead className="text-right">Avg cost</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Mkt value</TableHead>
+                <TableHead className="text-right">Gain / loss</TableHead>
+                <TableHead className="hidden text-right xl:table-cell">
+                  Weight
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {view.holdings.map((h) => (
+                <HoldingRow key={h.id} holding={h} />
+              ))}
+            </TableBody>
+          </Table>
         </TabsContent>
 
         {/* Performance chart */}
         <TabsContent value="performance">
           <Card>
             <CardHeader>
-              <CardTitle>Performance vs benchmark</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-[14px]">
+                Performance vs benchmark
+              </CardTitle>
+              <CardDescription className="text-[12.5px]">
                 {isEnriched && performance && performance.combined.length > 0
                   ? "Indexed to 100 at start of period. Dashed line is S&P 500 (SPY)."
                   : "Refresh market data to load price history and benchmark comparison."}
@@ -259,13 +269,13 @@ export default async function PortfolioViewPage({
             <CardContent className="space-y-4">
               {isEnriched && performance && performance.combined.length > 0 ? (
                 <>
-                  <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="flex flex-wrap gap-x-10 gap-y-3 border bg-background px-4 py-3">
                     {performance.portfolioReturnPct != null && (
-                      <div>
-                        <span className="text-muted-foreground">Your portfolio: </span>
+                      <div className="text-[12px] text-muted-foreground">
+                        Your portfolio
                         <span
                           className={cn(
-                            "font-semibold tabular-nums",
+                            "mt-0.5 block font-mono text-[15px] font-semibold",
                             performance.portfolioReturnPct >= 0
                               ? "text-success"
                               : "text-destructive",
@@ -277,9 +287,9 @@ export default async function PortfolioViewPage({
                       </div>
                     )}
                     {performance.benchmarkReturnPct != null && (
-                      <div>
-                        <span className="text-muted-foreground">S&P 500 (SPY): </span>
-                        <span className="font-semibold tabular-nums">
+                      <div className="text-[12px] text-muted-foreground">
+                        S&P 500 (SPY)
+                        <span className="mt-0.5 block font-mono text-[15px] font-semibold text-foreground">
                           {performance.benchmarkReturnPct >= 0 ? "+" : ""}
                           {formatPercent(performance.benchmarkReturnPct)}
                         </span>
@@ -287,11 +297,11 @@ export default async function PortfolioViewPage({
                     )}
                     {performance.portfolioReturnPct != null &&
                       performance.benchmarkReturnPct != null && (
-                        <div>
-                          <span className="text-muted-foreground">Alpha: </span>
+                        <div className="text-[12px] text-muted-foreground">
+                          Alpha
                           <span
                             className={cn(
-                              "font-semibold tabular-nums",
+                              "mt-0.5 block font-mono text-[15px] font-semibold",
                               performance.portfolioReturnPct -
                                 performance.benchmarkReturnPct >=
                                 0
@@ -318,10 +328,10 @@ export default async function PortfolioViewPage({
                   />
                 </>
               ) : (
-                <p className="py-12 text-center text-sm text-muted-foreground">
-                  No performance history yet. Click &quot;Refresh market data&quot; to
-                  fetch 1-year price history for your holdings.
-                </p>
+                <div className="border border-dashed bg-background p-8 text-center text-[12.5px] text-muted-foreground">
+                  No performance history yet. Choose &ldquo;Refresh market
+                  data&rdquo; to fetch 1-year price history for your holdings.
+                </div>
               )}
             </CardContent>
           </Card>
@@ -331,8 +341,8 @@ export default async function PortfolioViewPage({
         <TabsContent value="allocation">
           <Card>
             <CardHeader>
-              <CardTitle>Allocation by sector</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-[14px]">Allocation by sector</CardTitle>
+              <CardDescription className="text-[12.5px]">
                 Current weight breakdown across sectors.
               </CardDescription>
             </CardHeader>
@@ -340,29 +350,31 @@ export default async function PortfolioViewPage({
               {view.sectorAllocation.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
                   <AllocationChart data={view.sectorAllocation} />
-                  <ul className="space-y-2 self-center text-sm">
+                  <ul className="self-center border-t text-[12.5px]">
                     {view.sectorAllocation.map((s) => (
                       <li
                         key={s.name}
-                        className="flex items-center justify-between"
+                        className="flex items-center justify-between gap-4 border-b py-2"
                       >
-                        <span className="text-muted-foreground">{s.name}</span>
-                        <Badge variant="secondary">
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {s.name}
+                        </span>
+                        <span className="shrink-0 font-mono font-medium">
                           {view.totalValue && view.totalValue > 0
                             ? formatPercent(
                                 (s.value / view.totalValue) * 100,
                                 1,
                               )
                             : "—"}
-                        </Badge>
+                        </span>
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  Sector data will appear after enrichment.
-                </p>
+                <div className="border border-dashed bg-background p-8 text-center text-[12.5px] text-muted-foreground">
+                  Sector data will appear after market data is loaded.
+                </div>
               )}
             </CardContent>
           </Card>
@@ -381,40 +393,40 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
 
   return (
     <TableRow>
-      <TableCell className="pl-6">
+      <TableCell>
         <div className="flex items-center gap-2">
-          <span className="font-medium">{h.symbol}</span>
+          <span className="font-mono text-[13px] font-semibold">{h.symbol}</span>
           {!h.isEnriched && (
-            <Badge variant="outline" className="h-4 px-1 text-[9px] text-muted-foreground">
+            <Badge variant="outline" className="px-1 text-[10px] leading-4">
               no data
             </Badge>
           )}
         </div>
-      </TableCell>
-      <TableCell className="hidden max-w-[180px] truncate text-muted-foreground md:table-cell">
-        {h.name}
+        <div className="mt-px max-w-[220px] truncate text-[11.5px] text-faint">
+          {h.name}
+        </div>
       </TableCell>
       <TableCell className="hidden md:table-cell">
         {h.sector ? (
-          <Badge variant="outline" className="text-[10px]">
+          <span className="whitespace-nowrap rounded-md border bg-background px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
             {h.sector}
-          </Badge>
+          </span>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-faint">—</span>
         )}
       </TableCell>
-      <TableCell className="text-right tabular-nums">{h.quantity}</TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-right font-mono">{h.quantity}</TableCell>
+      <TableCell className="text-right font-mono">
         {h.averageCost != null ? formatCurrency(h.averageCost) : "—"}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-right font-mono">
         {h.currentPrice != null ? (
           <div>
             <div>{formatCurrency(h.currentPrice)}</div>
             {h.priceChangePercent != null && (
               <div
                 className={cn(
-                  "text-[10px]",
+                  "mt-px text-[11px]",
                   h.priceChangePercent >= 0 ? "text-success" : "text-destructive",
                 )}
               >
@@ -427,17 +439,17 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
           "—"
         )}
       </TableCell>
-      <TableCell className="text-right tabular-nums font-medium">
+      <TableCell className="text-right font-mono font-medium">
         {h.marketValue != null ? formatCurrency(h.marketValue) : "—"}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="whitespace-nowrap text-right font-mono">
         {h.unrealizedGainLoss != null ? (
           <span className={gainPositive ? "text-success" : "text-destructive"}>
             {gainPositive ? "+" : ""}
             {formatCurrency(h.unrealizedGainLoss)}
             {h.unrealizedGainLossPct != null && (
-              <span className="ml-1 text-[10px]">
-                ({formatPercent(h.unrealizedGainLossPct)})
+              <span className="ml-1.5 text-[11px] text-faint">
+                {formatPercent(h.unrealizedGainLossPct)}
               </span>
             )}
           </span>
@@ -445,7 +457,7 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
           "—"
         )}
       </TableCell>
-      <TableCell className="hidden text-right tabular-nums text-muted-foreground xl:table-cell">
+      <TableCell className="hidden text-right font-mono text-muted-foreground xl:table-cell">
         {h.weight != null ? formatPercent(h.weight * 100, 1) : "—"}
       </TableCell>
     </TableRow>

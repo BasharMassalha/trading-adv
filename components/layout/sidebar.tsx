@@ -1,33 +1,23 @@
 "use client";
 
-import { SquareTerminal } from "lucide-react";
-import { clientEnv } from "@/lib/env";
+import { BrandLockup } from "@/components/brand";
 import { NavLinks } from "@/components/layout/nav-links";
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:bg-card/40">
-      <div className="flex h-16 items-center gap-2 border-b px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <SquareTerminal className="h-4 w-4" />
-        </div>
-        <span className="text-base font-semibold tracking-tight">
-          {clientEnv.NEXT_PUBLIC_APP_NAME}
-        </span>
+    <aside className="hidden w-[216px] min-w-[216px] flex-col border-r bg-surface px-3 py-[18px] md:flex">
+      <div className="px-2 pb-4">
+        <BrandLockup size="sm" />
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 overflow-y-auto">
         <NavLinks />
       </nav>
 
-      <div className="border-t p-4">
-        <div className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Pro tip</p>
-          <p className="mt-1">
-            Upload a broker screenshot and let the AI advisor review your risk
-            profile.
-          </p>
-        </div>
+      <div className="mt-auto border-t px-2.5 pb-1 pt-3 text-[11px] leading-relaxed text-faint">
+        Analysis is evidence-led and cited.
+        <br />
+        Nothing executes without you.
       </div>
     </aside>
   );

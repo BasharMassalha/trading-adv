@@ -1,15 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, ShieldAlert } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/layout/page-header";
 import { MarketToday } from "@/components/dashboard/market-today";
 import { getMarketTodaySnapshot } from "@/server/services/market-snapshot.service";
 
@@ -29,66 +23,55 @@ export default async function MarketsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Markets</h1>
-          <p className="text-sm text-muted-foreground">
-            Live quotes for liquid US ETF proxies plus VIX when available —
-            layered with headline themes and rotation context. ETFs track
-            their indices closely but are not the index cash values.
-          </p>
-          <Badge variant="secondary" className="text-[10px]">
-            Data from your configured market/news providers
+    <div className="space-y-5">
+      <PageHeader
+        title="Markets"
+        description="Live quotes for liquid US ETF proxies plus VIX where available, layered with headline themes and rotation context. ETFs track their indices closely but are not the index cash values."
+        actions={
+          <Badge variant="secondary">
+            Data from your configured providers
           </Badge>
-        </div>
-      </div>
+        }
+      />
 
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-muted/40">
-        <CardHeader className="pb-2">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <ShieldAlert className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Risk regime lens</CardTitle>
-              <CardDescription>
-                See composite market stress indicators and historical
-                analogue scores — informational, not a forecast.
-              </CardDescription>
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border bg-surface px-5 py-3.5">
+        <div className="flex items-start gap-2.5">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+          <div>
+            <h2 className="text-[13.5px] font-semibold tracking-tight">
+              Risk regime lens
+            </h2>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              Composite market stress indicators and historical analogue scores.
+              Informational, not a forecast.
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <Button asChild variant="default" size="sm">
-            <Link href="/market-risk">Open Market Risk Regime Monitor</Link>
-          </Button>
-        </CardContent>
-      </Card>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/market-risk">Open risk monitor</Link>
+        </Button>
+      </div>
 
       {snapshot ? (
         <MarketToday snapshot={snapshot} />
       ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-16 text-center text-sm">
-            <AlertCircle className="h-8 w-8 text-muted-foreground" />
-            <p className="font-medium text-foreground">
-              Market snapshot unavailable
-            </p>
-            <p className="max-w-md text-muted-foreground">
-              Check{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                MARKET_DATA_PROVIDER
-              </code>{" "}
-              and network access. Indices and narratives will load automatically
-              when quotes succeed.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="border border-dashed bg-surface p-8 text-center">
+          <p className="text-[13px] font-medium text-foreground">
+            Market snapshot unavailable
+          </p>
+          <p className="mx-auto mt-1 max-w-md text-[13px] text-muted-foreground">
+            Check{" "}
+            <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11.5px]">
+              MARKET_DATA_PROVIDER
+            </code>{" "}
+            and network access. Indices and narratives load automatically once
+            quotes succeed.
+          </p>
+        </div>
       )}
 
       {snapshot && (
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-[11.5px] text-faint">
           As of{" "}
           {new Date(snapshot.fetchedAt).toLocaleString(undefined, {
             dateStyle: "medium",

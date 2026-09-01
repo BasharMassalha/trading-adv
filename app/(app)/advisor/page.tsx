@@ -9,25 +9,38 @@ import { AdvisorDashboard } from "./advisor-dashboard";
 export const metadata: Metadata = { title: "AI Advisor" };
 export const dynamic = "force-dynamic";
 
-export default async function AdvisorPage() {
+type Props = {
+  searchParams?: { portfolio?: string };
+};
+
+export default async function AdvisorPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) {
     redirect("/sign-in");
   }
 
-  // Load user's most recent portfolio
-  const portfolios = await portfolioRepository.listByUserWithHoldings(
+  const allPortfolios = await portfolioRepository.listByUserWithHoldings(
     session.userId,
-    1,
   );
-  const portfolio = portfolios[0] ?? null;
 
-  // Load investor profile
+  const portfolioOptions = allPortfolios.map((p) => ({
+    id: p.id,
+    name: p.name,
+    holdingCount: p.holdings.length,
+  }));
+
+  const requestedId = searchParams?.portfolio?.trim();
+  const portfolio =
+    (requestedId
+      ? allPortfolios.find((p) => p.id === requestedId)
+      : undefined) ??
+    allPortfolios[0] ??
+    null;
+
   const investorProfile = await analysisService.getInvestorProfile(
     session.userId,
   );
 
-  // Load latest report if we have a portfolio
   let latestReport = null;
   let readiness = null;
   let newsBundle = null;
@@ -63,6 +76,7 @@ export default async function AdvisorPage() {
 
   return (
     <AdvisorDashboard
+      portfolios={portfolioOptions}
       portfolio={
         portfolio
           ? {

@@ -1,8 +1,11 @@
 /**
  * Shared styling helpers for the Market Risk Regime Monitor UI.
  *
- * Centralises the regime → color/tone mapping so every section (the regime
- * card, the indicator bar, indicator cards, etc.) stays visually consistent.
+ * Centralises the regime → tone mapping so every section (the regime card,
+ * the indicator bar, indicator cards, etc.) stays visually consistent.
+ *
+ * Everything resolves to the design-system semantic tokens, so the same code
+ * works in both themes without `dark:` variants.
  */
 
 import type { RiskRegime } from "@/lib/market-risk/types";
@@ -15,26 +18,68 @@ export const REGIME_ORDER: RiskRegime[] = [
   "Extreme",
 ];
 
+/** The three stops of the risk ramp: calm → caution → stress. */
+type RampStop = "success" | "warning" | "destructive";
+
+function scoreToStop(score: number): RampStop {
+  const s = Math.max(0, Math.min(100, score));
+  if (s < 40) return "success";
+  if (s < 60) return "warning";
+  return "destructive";
+}
+
+function regimeToStop(regime: RiskRegime): RampStop {
+  switch (regime) {
+    case "Low":
+    case "Normal":
+      return "success";
+    case "Elevated":
+      return "warning";
+    case "High":
+    case "Extreme":
+      return "destructive";
+  }
+}
+
 /**
- * Score → HSL color string. Smoothly interpolates green → amber → red
- * across the 0–100 risk band. Returned as an inline-style-ready string.
+ * Score → CSS colour string on the success → warning → destructive ramp.
+ * Returned as an inline-style-ready string.
  */
 export function scoreToHsl(score: number): string {
-  const s = Math.max(0, Math.min(100, score));
-  // 0 -> 150 (green), 50 -> 45 (amber), 100 -> 0 (red)
-  const hue = 150 - (s / 100) * 150;
-  return `hsl(${hue.toFixed(0)}, 75%, 45%)`;
+  return `hsl(var(--${scoreToStop(score)}))`;
 }
 
 export function scoreToSoftHsl(score: number, alpha = 0.15): string {
-  const s = Math.max(0, Math.min(100, score));
-  const hue = 150 - (s / 100) * 150;
-  return `hsla(${hue.toFixed(0)}, 75%, 45%, ${alpha})`;
+  return `hsl(var(--${scoreToStop(score)}) / ${alpha})`;
 }
+
+const TONE_CLASSES: Record<
+  RampStop,
+  { text: string; bg: string; border: string; badge: string }
+> = {
+  success: {
+    text: "text-success",
+    bg: "bg-success-soft",
+    border: "border-success/30",
+    badge: "border-transparent bg-success-soft text-success",
+  },
+  warning: {
+    text: "text-warning",
+    bg: "bg-warning-soft",
+    border: "border-warning/30",
+    badge: "border-transparent bg-warning-soft text-warning",
+  },
+  destructive: {
+    text: "text-destructive",
+    bg: "bg-destructive-soft",
+    border: "border-destructive/30",
+    badge: "border-transparent bg-destructive-soft text-destructive",
+  },
+};
 
 /**
  * Tailwind classes describing the *tone* of a regime — used on chips,
- * borders, and indicator card backgrounds.
+ * borders, and indicator panel backgrounds.
  */
 export function regimeToneClasses(regime: RiskRegime): {
   text: string;
@@ -42,48 +87,7 @@ export function regimeToneClasses(regime: RiskRegime): {
   border: string;
   badge: string;
 } {
-  switch (regime) {
-    case "Low":
-      return {
-        text: "text-emerald-600 dark:text-emerald-400",
-        bg: "bg-emerald-500/10",
-        border: "border-emerald-500/30",
-        badge:
-          "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-      };
-    case "Normal":
-      return {
-        text: "text-sky-600 dark:text-sky-400",
-        bg: "bg-sky-500/10",
-        border: "border-sky-500/30",
-        badge:
-          "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
-      };
-    case "Elevated":
-      return {
-        text: "text-amber-600 dark:text-amber-400",
-        bg: "bg-amber-500/10",
-        border: "border-amber-500/30",
-        badge:
-          "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-      };
-    case "High":
-      return {
-        text: "text-orange-600 dark:text-orange-400",
-        bg: "bg-orange-500/10",
-        border: "border-orange-500/30",
-        badge:
-          "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30",
-      };
-    case "Extreme":
-      return {
-        text: "text-rose-600 dark:text-rose-400",
-        bg: "bg-rose-500/10",
-        border: "border-rose-500/30",
-        badge:
-          "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
-      };
-  }
+  return TONE_CLASSES[regimeToStop(regime)];
 }
 
 /** Short blurb for a regime banner. Plain language, no forecasts. */
@@ -94,10 +98,10 @@ export function regimeShortBlurb(regime: RiskRegime): string {
     case "Normal":
       return "Market conditions are within their typical historical range.";
     case "Elevated":
-      return "Several indicators have moved into the upper half — conditions may be choppier than usual.";
+      return "Several indicators have moved into the upper half. Conditions may be choppier than usual.";
     case "High":
-      return "Multiple indicators are running hot together — historically associated with risk-off regimes.";
+      return "Multiple indicators are running hot together, historically associated with risk-off regimes.";
     case "Extreme":
-      return "Indicators sit at stress-period levels — a risk signal, not a forecast of any specific outcome.";
+      return "Indicators sit at stress-period levels: a risk signal, not a forecast of any specific outcome.";
   }
 }

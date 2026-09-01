@@ -81,33 +81,29 @@ function DropZone({
       onDrop={handleDrop}
       disabled={status === "uploading"}
       className={cn(
-        "flex w-full flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-10 text-center transition-all",
-        drag
-          ? "border-primary bg-primary/5 scale-[1.01]"
-          : "border-muted hover:border-muted-foreground/40 hover:bg-muted/20",
-        status === "parsed" && "border-success/50 bg-success/5",
-        status === "error" && "border-destructive/50 bg-destructive/5",
+        "flex w-full flex-col items-center justify-center gap-3 border border-dashed bg-background p-8 text-center transition-colors",
+        drag ? "border-primary bg-primary-soft" : "hover:border-border-strong",
+        status === "parsed" && "border-success/30 bg-success-soft",
+        status === "error" && "border-destructive/30 bg-destructive-soft",
         status === "uploading" && "cursor-wait opacity-70",
       )}
     >
       {status === "uploading" ? (
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       ) : status === "parsed" ? (
-        <CheckCircle2 className="h-10 w-10 text-success" />
+        <CheckCircle2 className="h-6 w-6 text-success" />
       ) : (
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-          <Icon className="h-7 w-7 text-muted-foreground" />
-        </div>
+        <Icon className="h-6 w-6 text-faint" />
       )}
       <div>
-        <p className="text-sm font-medium">
+        <p className="text-[13px] font-medium">
           {status === "uploading"
             ? "Parsing your file…"
             : status === "parsed"
               ? "File parsed successfully"
               : "Drop your file here or click to browse"}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p>
       </div>
       <input
         ref={inputRef}
@@ -160,30 +156,30 @@ function ParseSummary({
     <div className="space-y-3">
       <div
         className={cn(
-          "flex items-start gap-3 rounded-lg border p-4",
+          "flex items-start gap-2.5 border px-3.5 py-3",
           result.status === "empty"
-            ? "border-destructive/40 bg-destructive/5"
+            ? "border-destructive/30 bg-destructive-soft"
             : hasWarnings
-              ? "border-amber-500/40 bg-amber-500/5"
-              : "border-green-500/40 bg-green-500/5",
+              ? "border-warning/30 bg-warning-soft"
+              : "border-success/30 bg-success-soft",
         )}
       >
         {result.status === "empty" ? (
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-destructive" />
         ) : hasWarnings ? (
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
         ) : (
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+          <CheckCircle2 className="mt-px h-3.5 w-3.5 shrink-0 text-success" />
         )}
-        <div className="min-w-0 flex-1 space-y-1 text-sm">
+        <div className="min-w-0 flex-1 text-[12.5px]">
           <p className="font-medium">
             {headline}
             {result.status === "partial" && (
-              <span className="ml-1 text-amber-600"> (some rows skipped)</span>
+              <span className="ml-1 text-warning">(some rows skipped)</span>
             )}
           </p>
           {hasWarnings ? (
-            <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+            <ul className="mt-1.5 space-y-0.5 text-[11.5px] text-muted-foreground">
               {result.warnings.slice(0, 4).map((w, i) => (
                 <li key={i} className="truncate">
                   {w}
@@ -202,19 +198,17 @@ function ParseSummary({
           <Badge variant="secondary">
             {result.sourceType} · {result.filename}
           </Badge>
-          <Badge variant="outline">{result.holdings.length} holdings</Badge>
-          {providerLabel && (
-            <Badge variant="outline" className="text-muted-foreground">
-              via {providerLabel}
-            </Badge>
-          )}
+          <Badge variant="outline">
+            <span className="font-mono">{result.holdings.length}</span> holdings
+          </Badge>
+          {providerLabel && <Badge variant="outline">via {providerLabel}</Badge>}
         </div>
       )}
 
       {result.status === "empty" && result.sourceType === "IMAGE" && !isServiceError && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Tips for better extraction:</p>
-          <ul className="mt-1 list-inside list-disc space-y-0.5">
+        <div className="border border-warning/30 bg-warning-soft p-3.5 text-[12px] text-muted-foreground">
+          <p className="font-medium text-foreground">Tips for better extraction</p>
+          <ul className="mt-1.5 list-inside list-disc space-y-0.5">
             <li>Use a clear, high-resolution screenshot</li>
             <li>Ensure the holdings table is fully visible</li>
             <li>Avoid cropping important columns (ticker, shares, price)</li>
@@ -224,8 +218,8 @@ function ParseSummary({
       )}
 
       {isRateLimited && (
-        <div className="rounded-md border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
-          The request was retried automatically. Wait a minute, then upload again —
+        <div className="border bg-background p-3.5 text-[12px] text-muted-foreground">
+          The request was retried automatically. Wait a minute, then upload again.
           or use CSV export for an immediate import.
         </div>
       )}
@@ -233,12 +227,12 @@ function ParseSummary({
       <div className="flex gap-2">
         {result.status !== "empty" && (
           <Button onClick={onReview} className="flex-1 sm:flex-none">
-            Review & confirm
-            <ArrowRight className="ml-2 h-4 w-4" />
+            Review &amp; confirm
+            <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         )}
         <Button variant="outline" onClick={onReset}>
-          <Upload className="mr-2 h-4 w-4" />
+          <Upload className="h-3.5 w-3.5" />
           {isServiceError ? "Try again" : "Upload different file"}
         </Button>
       </div>
@@ -314,13 +308,13 @@ export function UploadTabs({
 
   return (
     <Tabs defaultValue="csv">
-      <TabsList className="grid w-full grid-cols-2">
+      <TabsList>
         <TabsTrigger value="csv">
-          <FileText className="mr-2 h-4 w-4" />
+          <FileText className="h-3.5 w-3.5" />
           CSV file
         </TabsTrigger>
         <TabsTrigger value="image">
-          <ImageIcon className="mr-2 h-4 w-4" />
+          <ImageIcon className="h-3.5 w-3.5" />
           Screenshot
         </TabsTrigger>
       </TabsList>
@@ -329,33 +323,33 @@ export function UploadTabs({
       <TabsContent value="csv">
         <Card>
           <CardHeader>
-            <CardTitle>Upload CSV</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-[14px]">Upload CSV</CardTitle>
+            <CardDescription className="text-[12.5px]">
               Export your holdings from your broker and drop the file here. We
               auto-detect most column layouts (Schwab, Fidelity, IBKR, etc.).
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4">
             {csv.status !== "parsed" ? (
               <>
                 <DropZone
                   accept=".csv,.txt"
-                  hint="CSV up to 8 MB — columns detected automatically"
+                  hint="CSV up to 8 MB; columns detected automatically"
                   icon={FileText}
                   onFile={csv.upload}
                   status={csv.status}
                 />
                 {csv.status === "error" && csv.errorMessage && (
-                  <p className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <p className="flex items-center gap-2 border border-destructive/30 bg-destructive-soft px-3.5 py-2.5 text-[12.5px] text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     {csv.errorMessage}
                   </p>
                 )}
-                <div className="rounded-md border bg-muted/30 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="border bg-background p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-faint">
                     Supported column names (sample)
                   </p>
-                  <pre className="mt-2 overflow-x-auto font-mono text-xs text-foreground/80">
+                  <pre className="mt-2.5 overflow-x-auto font-mono text-[11.5px] text-muted-foreground">
                     {`Symbol,   Quantity,  AvgCost,  MarketValue,  Currency
 Ticker,   Shares,    Avg Price, Mkt Value,   Curr
 Stock,    Qty,       Cost Basis, Value,      USD`}
@@ -377,43 +371,48 @@ Stock,    Qty,       Cost Basis, Value,      USD`}
       <TabsContent value="image">
         <Card>
           <CardHeader>
-            <CardTitle>Upload screenshot</CardTitle>
-            <CardDescription>
-              Take a screenshot of your broker's portfolio page. AI will read
-              your holdings automatically.
+            <CardTitle className="text-[14px]">Upload screenshot</CardTitle>
+            <CardDescription className="text-[12.5px]">
+              Take a screenshot of your broker&rsquo;s portfolio page. AI reads
+              the holdings automatically.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4">
             {img.status !== "parsed" ? (
               <>
                 <DropZone
                   accept="image/png,image/jpeg,image/webp"
-                  hint="PNG, JPG or WebP up to 8 MB — higher resolution = better accuracy"
+                  hint="PNG, JPG or WebP up to 8 MB; higher resolution = better accuracy"
                   icon={ImageIcon}
                   onFile={img.upload}
                   status={img.status}
                 />
                 {img.status === "error" && img.errorMessage && (
-                  <p className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <p className="flex items-center gap-2 border border-destructive/30 bg-destructive-soft px-3.5 py-2.5 text-[12.5px] text-destructive">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     {img.errorMessage}
                   </p>
                 )}
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    "Schwab portfolio",
-                    "Fidelity holdings",
-                    "Robinhood positions",
-                    "IBKR activity",
-                  ].map((label) => (
-                    <div
-                      key={label}
-                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs text-muted-foreground"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                      {label}
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-faint">
+                    Layouts we read reliably
+                  </p>
+                  <div className="mt-2.5 grid grid-cols-2 gap-2">
+                    {[
+                      "Schwab portfolio",
+                      "Fidelity holdings",
+                      "Robinhood positions",
+                      "IBKR activity",
+                    ].map((label) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-[11.5px] text-muted-foreground"
+                      >
+                        <CheckCircle2 className="h-3 w-3 shrink-0 text-success" />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </>
             ) : (

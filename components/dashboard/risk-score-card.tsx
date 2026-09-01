@@ -1,169 +1,149 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Shield, TrendingUp } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RiskScoreResult } from "@/lib/portfolio/risk-score";
 
-function ScoreGauge({
-  score,
-  comfortLevel,
-}: {
-  score: number;
-  comfortLevel: number;
-}) {
-  const pct = (score / 10) * 100;
-  const comfortPct = (comfortLevel / 10) * 100;
+const IMPACT_TONE: Record<string, string> = {
+  high: "bg-destructive",
+  medium: "bg-warning",
+  low: "bg-faint",
+};
 
-  return (
-    <div className="relative mx-auto w-full max-w-xs">
-      <div className="relative h-3 overflow-hidden rounded-full bg-muted">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-destructive transition-all"
-          style={{ width: `${pct}%` }}
-        />
-        <div
-          className="absolute top-1/2 z-10 h-5 w-0.5 -translate-y-1/2 rounded-full bg-foreground shadow-sm"
-          style={{ left: `calc(${comfortPct}% - 1px)` }}
-          title={`Your comfort level: ${comfortLevel}/10`}
-        />
-      </div>
-      <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
-        <span>Low risk</span>
-        <span>High risk</span>
-      </div>
-    </div>
-  );
-}
+/** Absolute risk level, independent of whether it matches the mandate. */
+const LEVEL_TONE: Record<string, string> = {
+  Low: "bg-success-soft text-success",
+  Moderate: "bg-primary-soft text-primary",
+  Elevated: "bg-warning-soft text-warning",
+  High: "bg-destructive-soft text-destructive",
+};
 
 export function RiskScoreCard({
   result,
   showAdvisorLink = true,
   compact = false,
+  portfolioId,
 }: {
   result: RiskScoreResult;
   showAdvisorLink?: boolean;
   compact?: boolean;
+  portfolioId?: string;
 }) {
   const isAbove = result.alignment === "above";
   const isBelow = result.alignment === "below";
 
   const headline = isAbove
-    ? "Portfolio risk is above your comfort level"
+    ? "Measured risk sits above the comfort level you set"
     : isBelow
-      ? "Portfolio risk is below your comfort level"
-      : "Portfolio risk aligns with your profile";
+      ? "Measured risk sits below the comfort level you set"
+      : "Measured risk is in line with the comfort level you set";
 
-  const Icon = isAbove ? AlertTriangle : isBelow ? TrendingUp : Shield;
+  const fillPct = Math.max(0, Math.min(100, (result.score / 10) * 100));
+  const comfortPct = Math.max(
+    0,
+    Math.min(100, (result.comfortLevel / 10) * 100),
+  );
 
   return (
-    <Card
-      className={cn(
-        "border-border/70",
-        isAbove && "border-amber-500/40 bg-amber-500/[0.03]",
-        isBelow && "border-emerald-500/30 bg-emerald-500/[0.03]",
-      )}
-    >
-      <CardHeader className={compact ? "pb-2" : undefined}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Icon
-                className={cn(
-                  "h-4 w-4",
-                  isAbove && "text-amber-500",
-                  isBelow && "text-emerald-500",
-                  !isAbove && !isBelow && "text-primary",
-                )}
-              />
-              Risk vs profile
-            </CardTitle>
-            <CardDescription className="mt-1">{headline}</CardDescription>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-semibold tabular-nums tracking-tight">
-              {result.score}
-              <span className="text-base font-normal text-muted-foreground">/10</span>
-            </div>
-            <Badge variant="outline" className="mt-1 text-[10px]">
-              {result.riskLabel} risk
-            </Badge>
-          </div>
+    <div className="border bg-surface p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[13.5px] font-semibold">Risk exposure</h3>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">{headline}</p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ScoreGauge score={result.score} comfortLevel={result.comfortLevel} />
+        <span
+          className={cn(
+            "rounded-[5px] px-2 py-0.5 text-[11px] font-medium",
+            LEVEL_TONE[result.riskLabel] ?? "bg-primary-soft text-primary",
+          )}
+        >
+          {result.riskLabel} risk
+        </span>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-          <span>
-            Your portfolio:{" "}
-            <strong className="text-foreground">{result.score}/10</strong>
+      {/* Scale with a marker at the stated comfort level */}
+      <div className="relative mt-5 h-2 bg-border">
+        <div
+          className="absolute inset-y-0 left-0 bg-foreground transition-all"
+          style={{ width: `${fillPct}%` }}
+        />
+        <div
+          className="absolute -top-1 h-4 w-0.5 bg-destructive"
+          style={{ left: `calc(${comfortPct}% - 1px)` }}
+          title={`Comfort level: ${result.comfortLevel}/10`}
+        />
+      </div>
+      <div className="mt-2 flex justify-between font-mono text-[10.5px] text-faint">
+        {[0, 2, 4, 6, 8, 10].map((t) => (
+          <span key={t}>{t}</span>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3 border-t pt-4">
+        <div className="text-[12px] text-muted-foreground">
+          Your portfolio
+          <span className="mt-0.5 block font-mono text-[15px] font-semibold text-foreground">
+            {result.score}
           </span>
-          <span className="hidden sm:inline">·</span>
-          <span>
-            {result.comfortLabel} comfort:{" "}
-            <strong className="text-foreground">{result.comfortLevel}/10</strong>
+        </div>
+        <div className="text-[12px] text-muted-foreground">
+          {result.comfortLabel} comfort
+          <span className="mt-0.5 block font-mono text-[15px] font-semibold text-foreground">
+            {result.comfortLevel}
           </span>
-          {result.delta !== 0 && (
-            <>
-              <span className="hidden sm:inline">·</span>
+        </div>
+        <div className="text-[12px] text-muted-foreground">
+          Delta
+          <span
+            className={cn(
+              "mt-0.5 block font-mono text-[15px] font-semibold",
+              isAbove
+                ? "text-destructive"
+                : isBelow
+                  ? "text-success"
+                  : "text-foreground",
+            )}
+          >
+            {result.delta > 0 ? "+" : ""}
+            {result.delta}
+          </span>
+        </div>
+      </div>
+
+      {!compact && result.factors.length > 0 ? (
+        <ul className="mt-4 space-y-1.5">
+          {result.factors.map((f) => (
+            <li
+              key={f.label}
+              className="flex items-start gap-2.5 border px-2.5 py-2 text-[11.5px] text-muted-foreground"
+            >
               <span
                 className={cn(
-                  isAbove && "text-amber-600",
-                  isBelow && "text-emerald-600",
+                  "mt-[5px] h-[7px] w-[7px] shrink-0",
+                  IMPACT_TONE[f.impact] ?? "bg-faint",
                 )}
-              >
-                {result.delta > 0 ? "+" : ""}
-                {result.delta} vs target
+              />
+              <span>
+                <span className="font-medium text-foreground">{f.label}</span>
+                {f.detail ? <>, {f.detail}</> : null}
               </span>
-            </>
-          )}
-        </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-        {!compact && (
-          <ul className="space-y-2">
-            {result.factors.map((f) => (
-              <li
-                key={f.label}
-                className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm"
-              >
-                <Badge
-                  variant={
-                    f.impact === "high"
-                      ? "destructive"
-                      : f.impact === "medium"
-                        ? "warning"
-                        : "secondary"
-                  }
-                  className="mt-0.5 shrink-0 text-[9px]"
-                >
-                  {f.impact}
-                </Badge>
-                <div>
-                  <span className="font-medium">{f.label}</span>
-                  <p className="text-xs text-muted-foreground">{f.detail}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {showAdvisorLink && isAbove && (
-          <Button variant="outline" size="sm" className="w-full gap-1" asChild>
-            <Link href="/advisor">
-              Get rebalancing ideas
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+      {showAdvisorLink && isAbove ? (
+        <Button variant="outline" size="sm" className="mt-4" asChild>
+          <Link
+            href={
+              portfolioId
+                ? `/advisor?portfolio=${encodeURIComponent(portfolioId)}`
+                : "/advisor"
+            }
+          >
+            Get rebalancing ideas
+          </Link>
+        </Button>
+      ) : null}
+    </div>
   );
 }
