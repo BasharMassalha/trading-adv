@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import {
   Card,
@@ -25,7 +26,9 @@ export default function SignUpPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <SignUpForm googleEnabled={googleEnabled} />
+        <Suspense fallback={null}>
+          <SignUpForm googleEnabled={googleEnabled} />
+        </Suspense>
         <p className="mt-6 text-[13px] text-muted-foreground">
           Already have an account?{" "}
           <Link

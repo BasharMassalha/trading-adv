@@ -7,6 +7,7 @@ import { LoadingOverlay } from "@/components/loading/loading-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
 const GOOGLE_ERROR: Record<string, string> = {
   google_cancelled: "Google sign in was cancelled.",
   google_unconfigured: "Google sign in is not configured on this environment.",
@@ -49,7 +50,12 @@ export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean 
       if (!res.ok || !json.ok) {
         throw new Error(json?.error?.message ?? "Failed to sign in");
       }
-      router.push("/dashboard");
+      const next = searchParams.get("next");
+      const redirectTo =
+        (typeof json.data?.redirectTo === "string" && json.data.redirectTo) ||
+        next ||
+        "/dashboard";
+      router.push(redirectTo);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");

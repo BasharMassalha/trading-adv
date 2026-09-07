@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { ok, fail, withErrorHandling } from "@/lib/api-response";
-import { getSession } from "@/lib/auth";
+import { ok, withErrorHandling } from "@/lib/api-response";
+import { requireRegisteredSession } from "@/lib/auth";
 import { advisorChatSchema } from "@/server/validators/advisor.validator";
 import { advisorService } from "@/server/services/advisor.service";
 
@@ -8,18 +8,10 @@ import { advisorService } from "@/server/services/advisor.service";
  * POST /api/advisor/chat
  * Send a message to the AI advisor and receive a context-aware response.
  *
- * The response is grounded in:
- * - User's investment profile
- * - Latest portfolio report
- * - Current portfolio data
- *
- * Requires OPENAI_API_KEY (OpenAI only; no mock fallback).
+ * Guests must convert to a registered account before chatting.
  */
 export const POST = withErrorHandling(async (req: NextRequest) => {
-  const session = await getSession();
-  if (!session) {
-    return fail(401, "UNAUTHORIZED", "Please sign in to continue.");
-  }
+  const session = await requireRegisteredSession();
 
   const body = await req.json();
   const { messages, portfolioId } = advisorChatSchema.parse(body);
@@ -43,10 +35,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
  * Get information about the chat provider configuration.
  */
 export const GET = withErrorHandling(async () => {
-  const session = await getSession();
-  if (!session) {
-    return fail(401, "UNAUTHORIZED", "Please sign in to continue.");
-  }
+  await requireRegisteredSession();
 
   return ok({
     provider: advisorService.getChatProviderName(),

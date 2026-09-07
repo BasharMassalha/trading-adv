@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 import { Button } from "@/components/ui/button";
+import { TryFreeAnalysisButton } from "@/components/landing/try-free-analysis-button";
 
 function useNavClick() {
   return useBeginNavigation();
@@ -17,7 +18,10 @@ export function LandingHeaderNav() {
           Sign in
         </Link>
       </Button>
-      <Button size="sm" asChild>
+      <TryFreeAnalysisButton tone="inline" className="hidden sm:inline-flex">
+        Try free
+      </TryFreeAnalysisButton>
+      <Button size="sm" variant="outline" asChild className="sm:hidden">
         <Link href="/sign-up" onClick={onNav}>
           Get started
         </Link>
@@ -29,17 +33,29 @@ export function LandingHeaderNav() {
 export function LandingHeroCtas() {
   const onNav = useNavClick();
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button size="lg" asChild>
-        <Link href="/sign-up" onClick={onNav}>
-          Start free
+    <div className="flex flex-col gap-4">
+      <TryFreeAnalysisButton tone="hero">
+        Try it on your portfolio
+      </TryFreeAnalysisButton>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px]">
+        <Link
+          href="/sign-up"
+          onClick={onNav}
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Or create an account
         </Link>
-      </Button>
-      <Button size="lg" variant="outline" asChild>
-        <Link href="/dashboard" onClick={onNav}>
+        <span className="text-border-strong" aria-hidden>
+          ·
+        </span>
+        <Link
+          href="/dashboard"
+          onClick={onNav}
+          className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
           See a worked example
         </Link>
-      </Button>
+      </div>
     </div>
   );
 }
@@ -47,14 +63,20 @@ export function LandingHeroCtas() {
 export function LandingBottomCtas({ appName }: { appName: string }) {
   const onNav = useNavClick();
   return (
-    <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-      <Button size="lg" asChild>
-        <Link href="/sign-up" onClick={onNav}>
+    <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+      <TryFreeAnalysisButton tone="inverse">
+        Try it on your portfolio
+      </TryFreeAnalysisButton>
+      <p className="max-w-[280px] text-[12.5px] text-background/55 sm:text-right">
+        Prefer an account first?{" "}
+        <Link
+          href="/sign-up"
+          onClick={onNav}
+          className="font-medium text-background underline-offset-4 hover:underline"
+        >
           Get started with {appName}
         </Link>
-      </Button>
-      <p className="text-[12.5px] text-faint">
-        Already have an account?{" "}
+        {" · "}
         <Link
           href="/sign-in"
           onClick={onNav}

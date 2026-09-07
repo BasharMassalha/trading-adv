@@ -2,6 +2,8 @@ import { type NextRequest } from "next/server";
 import { ok, fail, withErrorHandling } from "@/lib/api-response";
 import { getSession } from "@/lib/auth";
 import { analysisService } from "@/server/services/analysis.service";
+import { guestTrialService } from "@/server/services/guest-trial.service";
+import { userRepository } from "@/server/repositories/user.repository";
 
 /** GPT-5 analysis can take 2+ minutes — allow up to 5 min on Vercel Pro. */
 export const maxDuration = 300;
@@ -19,6 +21,18 @@ export const POST = withErrorHandling(
     const session = await getSession();
     if (!session) {
       return fail(401, "UNAUTHORIZED", "Please sign in to continue.");
+    }
+
+    if (session.isGuest) {
+      const active = await userRepository.isGuestActive(session.userId);
+      if (!active) {
+        return fail(
+          401,
+          "TRIAL_EXPIRED",
+          "Your free trial has expired. Sign up to continue.",
+        );
+      }
+      await guestTrialService.assertCanAnalyze(session.userId);
     }
 
     const portfolioId = params.id;

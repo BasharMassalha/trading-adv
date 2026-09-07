@@ -164,9 +164,6 @@ export default function LandingPage() {
             <div className="mt-8">
               <LandingHeroCtas />
             </div>
-            <p className="mt-7 text-[12.5px] text-faint">
-              No credit card required. Works with any brokerage export.
-            </p>
           </div>
 
           <LandingAnalysisFrame />
@@ -300,11 +297,11 @@ export default function LandingPage() {
         <div className="flex flex-col gap-8 rounded-[14px] bg-foreground px-8 py-11 sm:flex-row sm:items-center sm:justify-between md:px-14">
           <div>
             <h2 className="text-[24px] font-semibold leading-tight tracking-tight text-background">
-              Start reading your portfolio like an analyst.
+              Run a free analysis on your own book.
             </h2>
-            <p className="mt-2 text-[13.5px] text-faint">
-              Free to start. Bring one brokerage export and see the difference
-              on your own positions.
+            <p className="mt-2 text-[13.5px] text-background/55">
+              No account needed. Upload one brokerage export and see the case
+              for your positions in a few minutes.
             </p>
           </div>
           <LandingBottomCtas appName={name} />

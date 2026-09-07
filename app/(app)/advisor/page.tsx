@@ -91,6 +91,7 @@ export default async function AdvisorPage({ searchParams }: Props) {
       latestReport={latestReport}
       readiness={readiness}
       newsBundle={newsBundle}
+      isGuest={session.isGuest === true}
     />
   );
 }

@@ -41,7 +41,7 @@ export const confirmImportSchema = z.object({
     .default("My Portfolio"),
 
   /** Upload channel — determines the `source` field on the Portfolio model */
-  source: z.enum(["CSV", "IMAGE"]),
+  source: z.enum(["CSV", "IMAGE", "MANUAL"]),
 
   /** ISO 4217 base currency */
   baseCurrency: z

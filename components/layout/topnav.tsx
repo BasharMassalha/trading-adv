@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Search } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MarketStatusPill } from "@/components/layout/market-status-pill";
 import { BrandLockup } from "@/components/brand";
@@ -23,12 +24,13 @@ import { brandInitials } from "@/components/brand";
 
 type TopnavProps = {
   onOpenMobileNav?: () => void;
+  isGuest?: boolean;
 };
 
-export function Topnav({ onOpenMobileNav }: TopnavProps) {
+export function Topnav({ onOpenMobileNav, isGuest = false }: TopnavProps) {
   const pathname = usePathname();
   const beginNavigation = useBeginNavigation();
-  const section = currentNavLabel(pathname);
+  const section = currentNavLabel(pathname, isGuest);
 
   const navigateUnless = (prefix: string) => () => {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return;
@@ -48,37 +50,32 @@ export function Topnav({ onOpenMobileNav }: TopnavProps) {
           <Menu className="h-5 w-5" />
         </Button>
         <Link
-          href="/dashboard"
-          onClick={navigateUnless("/dashboard")}
+          href={isGuest ? "/portfolio/upload?trial=true" : "/dashboard"}
+          onClick={navigateUnless(isGuest ? "/portfolio/upload" : "/dashboard")}
           className="min-w-0"
         >
           <BrandLockup size="sm" />
         </Link>
       </div>
 
-      <div className="hidden text-[12.5px] text-faint md:block">
-        {clientEnv.NEXT_PUBLIC_APP_NAME}
-        {section ? (
+      <div className="hidden items-center gap-2 text-[12.5px] text-faint md:flex">
+        {isGuest ? (
           <>
-            {" / "}
-            <span className="font-medium text-foreground">{section}</span>
+            <Badge variant="info" className="font-normal">
+              Free trial
+            </Badge>
+            <span aria-hidden>·</span>
           </>
+        ) : (
+          <span>{clientEnv.NEXT_PUBLIC_APP_NAME}</span>
+        )}
+        {section ? (
+          <span className="font-medium text-foreground">{section}</span>
         ) : null}
       </div>
 
-      <div className="ml-auto flex items-center gap-2 md:gap-4">
-        <div className="relative hidden w-[280px] lg:block">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
-          <input
-            placeholder="Search tickers, portfolios, reports"
-            className="h-[30px] w-full rounded-md border bg-background pl-8 pr-11 text-[12.5px] text-foreground placeholder:text-faint focus:border-primary focus:outline-none"
-          />
-          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border-strong bg-surface px-1.5 py-px font-mono text-[10.5px] text-faint">
-            ⌘K
-          </kbd>
-        </div>
-
-        <MarketStatusPill />
+      <div className="ml-auto flex items-center gap-2 md:gap-3">
+        {!isGuest ? <MarketStatusPill /> : null}
         <ThemeToggle />
 
         <DropdownMenu>
@@ -88,29 +85,54 @@ export function Topnav({ onOpenMobileNav }: TopnavProps) {
               aria-label="Account menu"
             >
               <Avatar className="h-7 w-7">
-                <AvatarFallback>{brandInitials()}</AvatarFallback>
+                <AvatarFallback>{isGuest ? "G" : brandInitials()}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>My account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/settings" onClick={navigateUnless("/settings")}>
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/advisor" onClick={navigateUnless("/advisor")}>
-                AI advisor
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/api/auth/sign-out" onClick={beginNavigation}>
-                Sign out
-              </Link>
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-56">
+            {isGuest ? (
+              <>
+                <DropdownMenuLabel>Guest trial</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/sign-up?from=trial" onClick={beginNavigation}>
+                    Create account to keep this
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/sign-in?from=trial" onClick={beginNavigation}>
+                    Sign in
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/api/auth/sign-out" onClick={beginNavigation}>
+                    End trial
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuLabel>My account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" onClick={navigateUnless("/settings")}>
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/advisor" onClick={navigateUnless("/advisor")}>
+                    AI advisor
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/api/auth/sign-out" onClick={beginNavigation}>
+                    Sign out
+                  </Link>
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

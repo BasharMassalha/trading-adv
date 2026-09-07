@@ -50,6 +50,20 @@ export function normalizeTicker(raw: string | undefined | null): string {
 }
 
 /**
+ * When a brokerage screenshot shows a market price but no average cost,
+ * copy currentPrice into averageCost so cost basis / P&L can still be
+ * computed. Does not overwrite an existing averageCost.
+ */
+export function fillMissingAverageCostFromPrice(
+  holdings: ParsedHolding[],
+): ParsedHolding[] {
+  return holdings.map((h) => {
+    if (h.averageCost != null || h.currentPrice == null) return h;
+    return { ...h, averageCost: h.currentPrice };
+  });
+}
+
+/**
  * Merge holdings with duplicate tickers by summing shares and computing a
  * weighted-average cost basis. Other fields (price, value, gain/loss) are
  * summed when numeric.

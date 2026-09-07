@@ -19,15 +19,22 @@ const SUGGESTIONS = [
 
 type Props = {
   portfolioId?: string;
+  isGuest?: boolean;
+  onRequireSignup?: () => void;
 };
 
-export function AdvisorChat({ portfolioId }: Props) {
+export function AdvisorChat({
+  portfolioId,
+  isGuest = false,
+  onRequireSignup,
+}: Props) {
   const [messages, setMessages] = useState<Msg[]>([
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "I can analyse your holdings, explain your risk exposure, and work through rebalancing options. Ask a question to start.",
+      content: isGuest
+        ? "Your free analysis is ready above. Sign up to ask follow-up questions grounded in your report."
+        : "I can analyse your holdings, explain your risk exposure, and work through rebalancing options. Ask a question to start.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -42,6 +49,12 @@ export function AdvisorChat({ portfolioId }: Props) {
   async function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
+
+    if (isGuest) {
+      onRequireSignup?.();
+      return;
+    }
+
     setInput("");
     setError(null);
 
@@ -54,7 +67,6 @@ export function AdvisorChat({ portfolioId }: Props) {
     setLoading(true);
 
     try {
-      // Build history without the welcome message ID, and only include role/content
       const history = [...messages, userMsg].map((m) => ({
         role: m.role,
         content: m.content,
@@ -72,6 +84,12 @@ export function AdvisorChat({ portfolioId }: Props) {
       const json = await res.json();
 
       if (!res.ok || !json.ok) {
+        const code = json.error?.code as string | undefined;
+        if (code === "TRIAL_SIGNUP_REQUIRED") {
+          onRequireSignup?.();
+          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+          return;
+        }
         const errorMsg = json.error?.message ?? "Failed to get response";
         console.error("[advisor-chat] Error:", json.error);
         setError(errorMsg);
@@ -89,7 +107,10 @@ export function AdvisorChat({ portfolioId }: Props) {
       const reply: Msg = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: json.data.message?.content ?? json.data.content ?? "I couldn't generate a response. Please try again.",
+        content:
+          json.data.message?.content ??
+          json.data.content ??
+          "I couldn't generate a response. Please try again.",
       };
       setMessages((prev) => [...prev, reply]);
     } catch (err) {
@@ -119,36 +140,36 @@ export function AdvisorChat({ portfolioId }: Props) {
                 m.role === "assistant" ? "bg-surface" : "bg-background",
               )}
             >
-              <div className="border-b px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-faint">
+              <div className="border-b px-3 py-1.5 text-[10.5px] uppercase tracking-wide text-faint">
                 {m.role === "assistant" ? "Advisor" : "You"}
               </div>
-              <div className="px-3 py-2.5 text-[13.5px] leading-relaxed">
+              <div className="whitespace-pre-wrap px-3 py-2.5 text-[13px] leading-relaxed">
                 {m.content}
               </div>
             </div>
           ))}
           {loading && (
-            <div className="border bg-surface">
-              <div className="border-b px-3 py-1.5 font-mono text-[11px] uppercase tracking-wide text-faint">
-                Advisor
-              </div>
-              <div className="flex items-center gap-2 px-3 py-2.5 text-[13px] text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin stroke-[1.6]" />
-                Working on it…
-              </div>
+            <div className="flex items-center gap-2 px-1 text-[12.5px] text-faint">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Thinking…
             </div>
           )}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
-      {messages.length === 1 && !loading && (
-        <div className="flex flex-wrap gap-2 px-4 pb-3">
+      {error ? (
+        <p className="border-t px-4 py-2 text-[12px] text-destructive">{error}</p>
+      ) : null}
+
+      {messages.length <= 1 && (
+        <div className="flex flex-wrap gap-2 border-t px-4 py-3">
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
+              type="button"
+              className="border bg-background px-2.5 py-1 text-left text-[12px] text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => send(s)}
-              className="rounded-md border bg-surface px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
             >
               {s}
             </button>
@@ -156,43 +177,34 @@ export function AdvisorChat({ portfolioId }: Props) {
         </div>
       )}
 
-      <div className="border-t p-4">
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
+      <form
+        className="flex items-end gap-2 border-t p-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input);
+        }}
+      >
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={
+            isGuest
+              ? "Sign up to ask a follow-up…"
+              : "Ask about concentration, rebalancing, risk…"
+          }
+          className="min-h-[44px] flex-1 resize-none"
+          rows={2}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send(input);
+            }
           }}
-        >
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about your portfolio…"
-            className="min-h-[44px] max-h-32 resize-none"
-            rows={1}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send(input);
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!input.trim() || loading}
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
-            ) : (
-              <Send className="h-4 w-4 stroke-[1.6]" />
-            )}
-          </Button>
-        </form>
-        <p className="mt-2.5 text-center text-[11px] text-faint">
-          Informational analysis only, not financial advice.
-        </p>
-      </div>
+        />
+        <Button type="submit" size="icon" disabled={loading || !input.trim()}>
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
     </div>
   );
 }

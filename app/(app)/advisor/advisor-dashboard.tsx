@@ -30,7 +30,11 @@ import {
   PortfolioNewsSection,
   type NewsBundleView,
 } from "./portfolio-news-section";
-import type { ReportView, InvestorProfileView } from "@/server/services/analysis.service";
+import type {
+  ReportView,
+  InvestorProfileView,
+  HoldingRecommendation,
+} from "@/server/services/analysis.service";
 import { TickerContextDrawer } from "@/components/advisor/ticker-context-drawer";
 import { HoldingsSlideshow } from "@/components/advisor/holdings-slideshow";
 import { BriefingPlayer } from "@/components/advisor/briefing-player";
@@ -38,6 +42,12 @@ import {
   AdvisorPortfolioPicker,
   type AdvisorPortfolioOption,
 } from "@/components/advisor/advisor-portfolio-picker";
+import { GuestTrialBanner } from "@/components/auth/guest-trial-banner";
+import { TrialSignupWall } from "@/components/auth/trial-signup-wall";
+import { TrialContentLock } from "@/components/auth/trial-content-lock";
+
+const GUEST_VISIBLE_HOLDINGS = 3;
+const GUEST_VISIBLE_NEWS = 2;
 
 type PortfolioSummary = {
   id: string;
@@ -62,6 +72,7 @@ type Props = {
   latestReport: ReportView | null;
   readiness: Readiness | null;
   newsBundle: NewsBundleView | null;
+  isGuest?: boolean;
 };
 
 export function AdvisorDashboard({
@@ -71,6 +82,7 @@ export function AdvisorDashboard({
   latestReport,
   readiness,
   newsBundle,
+  isGuest = false,
 }: Props) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -78,9 +90,29 @@ export function AdvisorDashboard({
   const [pulseTicker, setPulseTicker] = useState<string | null>(null);
   const [showSlideshow, setShowSlideshow] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
+  const [showSignupWall, setShowSignupWall] = useState(false);
+  const [wallCopy, setWallCopy] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
+
+  function openSignupWall(title: string, description: string) {
+    setWallCopy({ title, description });
+    setShowSignupWall(true);
+  }
 
   async function generateAnalysis() {
     if (!portfolio) return;
+
+    // Guests get one analysis; further runs require sign-up
+    if (isGuest && latestReport) {
+      openSignupWall(
+        "Sign up to run another analysis",
+        "You've used your free analysis. Create an account to regenerate reports and ask follow-ups.",
+      );
+      return;
+    }
+
     setGenerating(true);
     setError(null);
 
@@ -91,7 +123,16 @@ export function AdvisorDashboard({
       const json = await res.json();
 
       if (!json.ok) {
-        setError(json.message ?? "Failed to generate analysis.");
+        const code = json.error?.code as string | undefined;
+        if (code === "TRIAL_SIGNUP_REQUIRED" || code === "TRIAL_EXPIRED") {
+          openSignupWall(
+            "Sign up to continue",
+            json.error?.message ??
+              "Create a free account to keep analysing your portfolio.",
+          );
+          return;
+        }
+        setError(json.error?.message ?? json.message ?? "Failed to generate analysis.");
         return;
       }
 
@@ -166,10 +207,18 @@ export function AdvisorDashboard({
   }
 
   // ── Setup prompts ────────────────────────────────────────────────────────
-  const showSetupPrompts = !investorProfile || !readiness?.isEnriched;
+  const showSetupPrompts =
+    (!investorProfile && !isGuest) || !readiness?.isEnriched;
 
   return (
     <div className="space-y-5">
+      {isGuest ? (
+        <GuestTrialBanner
+          variant="advisor"
+          returnTo={portfolio ? `/advisor?portfolio=${portfolio.id}` : "/advisor"}
+        />
+      ) : null}
+
       <PageHeader
         title="AI advisor"
         description="Analysis, news, and chat for the portfolio you select below."
@@ -192,7 +241,16 @@ export function AdvisorDashboard({
                 size="sm"
                 variant="default"
                 className="gap-1.5"
-                onClick={() => setShowBriefing(true)}
+                onClick={() => {
+                  if (isGuest) {
+                    openSignupWall(
+                      "Sign up for voice briefings",
+                      "Voice narration is available on a free account. Sign up to keep your report and unlock briefings.",
+                    );
+                    return;
+                  }
+                  setShowBriefing(true);
+                }}
               >
                 <Film className="h-3.5 w-3.5 stroke-[1.6]" />
                 Watch briefing
@@ -206,7 +264,16 @@ export function AdvisorDashboard({
                   size="sm"
                   variant="outline"
                   className="gap-1.5"
-                  onClick={() => setShowSlideshow(true)}
+                  onClick={() => {
+                    if (isGuest) {
+                      openSignupWall(
+                        "Sign up for the full walkthrough",
+                        "Create a free account to walk through every holding and keep this analysis.",
+                      );
+                      return;
+                    }
+                    setShowSlideshow(true);
+                  }}
                 >
                   <Sparkles className="h-3.5 w-3.5 stroke-[1.6]" />
                   Walk through stocks
@@ -219,7 +286,7 @@ export function AdvisorDashboard({
       {/* Setup prompts */}
       {showSetupPrompts && (
         <div className="grid gap-4 sm:grid-cols-2">
-          {!investorProfile && (
+          {!investorProfile && !isGuest && (
             <div className="border bg-surface p-5">
               <div className="text-[11px] uppercase tracking-wide text-faint">
                 Setup
@@ -291,13 +358,31 @@ export function AdvisorDashboard({
             <PortfolioNewsSection
               bundle={newsBundle}
               portfolioName={portfolio.name}
+              isGuest={isGuest}
+              maxItems={isGuest ? GUEST_VISIBLE_NEWS : undefined}
+              onRequireSignup={() =>
+                openSignupWall(
+                  "Sign in to see more news",
+                  "Create a free account or sign in to open the full news feed and keep this analysis.",
+                )
+              }
             />
           ) : null}
         </TabsContent>
 
         <TabsContent value="report" className="mt-5">
           {latestReport ? (
-            <ReportDisplay report={latestReport} onTickerPulse={setPulseTicker} />
+            <ReportDisplay
+              report={latestReport}
+              onTickerPulse={setPulseTicker}
+              isGuest={isGuest}
+              onSeeMore={() =>
+                openSignupWall(
+                  "Sign in to see more",
+                  "Create a free account or sign in to unlock every holding verdict and keep this portfolio.",
+                )
+              }
+            />
           ) : (
             <EmptyReportState
               readiness={readiness}
@@ -308,7 +393,7 @@ export function AdvisorDashboard({
           )}
 
           {/* Generate / regenerate button */}
-          {latestReport && (
+          {latestReport && !isGuest && (
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
               <Button
                 onClick={generateAnalysis}
@@ -336,10 +421,36 @@ export function AdvisorDashboard({
 
         <TabsContent value="chat" className="mt-5">
           <div className="h-[calc(100vh-20rem)]">
-            <AdvisorChat portfolioId={portfolio.id} />
+            <AdvisorChat
+              portfolioId={portfolio.id}
+              isGuest={isGuest}
+              onRequireSignup={() =>
+                openSignupWall(
+                  "Sign up to ask follow-ups",
+                  "Chat with the advisor is available after you create a free account. Your analysis stays with you.",
+                )
+              }
+            />
           </div>
         </TabsContent>
       </Tabs>
+
+      {isGuest && latestReport ? (
+        <div className="sticky bottom-4 z-20 flex justify-center pt-2">
+          <Button
+            size="lg"
+            className="min-w-[160px] shadow-md"
+            onClick={() =>
+              openSignupWall(
+                "Sign in to save this portfolio",
+                "Create a free account or sign in to keep this book and your analysis. Without an account, this trial can expire.",
+              )
+            }
+          >
+            Save
+          </Button>
+        </div>
+      ) : null}
 
       {/* Disclaimer */}
       <p className="text-center text-[11px] text-faint">
@@ -368,6 +479,16 @@ export function AdvisorDashboard({
         report={latestReport}
         portfolioName={portfolio.name}
         news={newsBundle?.items}
+      />
+
+      <TrialSignupWall
+        open={showSignupWall}
+        onClose={() => setShowSignupWall(false)}
+        title={wallCopy?.title}
+        description={wallCopy?.description}
+        returnTo={
+          portfolio ? `/advisor?portfolio=${portfolio.id}` : "/advisor"
+        }
       />
     </div>
   );
@@ -421,13 +542,117 @@ function EmptyReportState({
   );
 }
 
+function HoldingReviewRow({
+  holding: h,
+  onTickerPulse,
+}: {
+  holding: HoldingRecommendation;
+  onTickerPulse: (ticker: string) => void;
+}) {
+  return (
+    <div className="border bg-background">
+      <div className="flex items-start gap-3 p-3.5">
+        <button
+          type="button"
+          onClick={() =>
+            h.ticker && h.ticker !== "BLEND"
+              ? onTickerPulse(h.ticker)
+              : undefined
+          }
+          className="shrink-0 rounded-md outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+          disabled={!h.ticker || h.ticker === "BLEND"}
+        >
+          <Badge
+            variant={
+              h.action === "CONSIDER_SELLING"
+                ? "destructive"
+                : h.action === "CONSIDER_REDUCING"
+                  ? "warning"
+                  : h.action === "CONSIDER_ADDING"
+                    ? "success"
+                    : "secondary"
+            }
+            className="cursor-pointer font-mono font-semibold"
+          >
+            {h.ticker}
+          </Badge>
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[13px] font-medium">
+              {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
+            </div>
+            {h.verdict && (
+              <Badge variant="outline" className="font-mono">
+                {h.verdict}
+                {h.conviction ? ` · ${h.conviction[0]}-conv` : ""}
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+            {h.reason}
+          </p>
+          {!h.ticker || h.ticker === "BLEND" ? null : (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <button
+                type="button"
+                onClick={() => onTickerPulse(h.ticker)}
+                className="text-[12px] font-medium text-primary underline-offset-4 hover:underline"
+              >
+                What’s moving lately
+              </button>
+              {(h.thesis || (h.bullCase?.length ?? 0) > 0) && (
+                <span className="text-[11px] text-faint">
+                  Open “Walk through stocks” for the full read
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      {(h.todoItems?.length ?? 0) > 0 && (
+        <div className="border-t px-3.5 py-3">
+          <div className="text-[11px] uppercase tracking-wide text-faint">
+            To-do
+          </div>
+          <ul className="mt-2 space-y-1.5">
+            {(h.todoItems ?? []).map((task, ti) => (
+              <li
+                key={ti}
+                className="flex gap-2.5 text-[12.5px] leading-relaxed"
+              >
+                <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
+                  {ti + 1}
+                </span>
+                <span>{task}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportDisplay({
   report,
   onTickerPulse,
+  isGuest = false,
+  onSeeMore,
 }: {
   report: ReportView;
   onTickerPulse: (ticker: string) => void;
+  isGuest?: boolean;
+  onSeeMore?: () => void;
 }) {
+  const allHoldings = report.actionPlan?.holdingsToReview ?? [];
+  const visibleHoldings = isGuest
+    ? allHoldings.slice(0, GUEST_VISIBLE_HOLDINGS)
+    : allHoldings;
+  const lockedHoldings = isGuest
+    ? allHoldings.slice(GUEST_VISIBLE_HOLDINGS)
+    : [];
+
   return (
     <div className="space-y-5">
       {/* Summary */}
@@ -470,167 +695,129 @@ function ReportDisplay({
               <h2 className="text-[13.5px] font-semibold tracking-tight">
                 Action plan
               </h2>
+              {isGuest && allHoldings.length > GUEST_VISIBLE_HOLDINGS ? (
+                <Badge variant="info" className="font-normal">
+                  {Math.min(GUEST_VISIBLE_HOLDINGS, allHoldings.length)} of{" "}
+                  {allHoldings.length}
+                </Badge>
+              ) : null}
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Holdings to review, names to research, and rebalancing steps drawn
-              from this analysis. Not personal financial advice.
+              {isGuest && allHoldings.length > GUEST_VISIBLE_HOLDINGS
+                ? `Showing ${GUEST_VISIBLE_HOLDINGS} of ${allHoldings.length} holdings to review.`
+                : "Holdings to review, names to research, and rebalancing steps drawn from this analysis. Not personal financial advice."}
             </p>
           </div>
           <div className="divide-y">
             {/* Holdings to review */}
-            {report.actionPlan.holdingsToReview && report.actionPlan.holdingsToReview.length > 0 && (
+            {visibleHoldings.length > 0 && (
               <div className="px-5 py-4">
                 <h3 className="text-[13px] font-semibold">
                   Holdings to review
                 </h3>
                 <div className="mt-3 space-y-2.5">
-                  {report.actionPlan.holdingsToReview.map((h, i) => (
-                    <div key={i} className="border bg-background">
-                      <div className="flex items-start gap-3 p-3.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            h.ticker && h.ticker !== "BLEND"
-                              ? onTickerPulse(h.ticker)
-                              : undefined
-                          }
-                          className="shrink-0 rounded-md outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                          disabled={!h.ticker || h.ticker === "BLEND"}
-                        >
-                          <Badge
-                            variant={
-                              h.action === "CONSIDER_SELLING"
-                                ? "destructive"
-                                : h.action === "CONSIDER_REDUCING"
-                                  ? "warning"
-                                  : h.action === "CONSIDER_ADDING"
-                                    ? "success"
-                                    : "secondary"
-                            }
-                            className="cursor-pointer font-mono font-semibold"
-                          >
-                            {h.ticker}
-                          </Badge>
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-[13px] font-medium">
-                              {h.action.replace("CONSIDER_", "Consider ").replace("_", " ")}
+                  {visibleHoldings.map((h, i) => (
+                    <HoldingReviewRow
+                      key={i}
+                      holding={h}
+                      onTickerPulse={onTickerPulse}
+                    />
+                  ))}
+                </div>
+
+                {lockedHoldings.length > 0 && onSeeMore ? (
+                  <div className="mt-3">
+                    <TrialContentLock
+                      title={`${lockedHoldings.length} more holding${lockedHoldings.length === 1 ? "" : "s"}`}
+                      description="See the rest of the action plan for this book."
+                      onSeeMore={onSeeMore}
+                      blurredPreview={
+                        <div className="space-y-2">
+                          {lockedHoldings.slice(0, 2).map((h, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 border bg-background p-2.5 text-[12px]"
+                            >
+                              <span className="font-mono font-semibold">
+                                {h.ticker}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {h.action
+                                  .replace("CONSIDER_", "Consider ")
+                                  .replace("_", " ")}
+                              </span>
                             </div>
-                            {h.verdict && (
-                              <Badge variant="outline" className="font-mono">
-                                {h.verdict}
-                                {h.conviction ? ` · ${h.conviction[0]}-conv` : ""}
-                              </Badge>
-                            )}
+                          ))}
+                        </div>
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Potential additions — always visible */}
+            {report.actionPlan.potentialAdditions &&
+              report.actionPlan.potentialAdditions.length > 0 && (
+                <div className="px-5 py-4">
+                  <h3 className="text-[13px] font-semibold">
+                    Stocks and ETFs to research next
+                  </h3>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                    Symbols for your watchlist. Informational only, not a
+                    recommendation to buy or sell. Verify against your plan,
+                    costs, and tax situation.
+                  </p>
+                  <div className="mt-3 space-y-2.5">
+                    {report.actionPlan.potentialAdditions.map((a, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-3 border bg-background p-3.5"
+                      >
+                        {a.ticker ? (
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 font-mono font-semibold"
+                          >
+                            {a.ticker}
+                          </Badge>
+                        ) : (
+                          <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-medium">
+                            {a.suggestion}
                           </div>
                           <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-                            {h.reason}
+                            {a.rationale}
                           </p>
-                          {!h.ticker || h.ticker === "BLEND" ? null : (
-                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                              <button
-                                type="button"
-                                onClick={() => onTickerPulse(h.ticker)}
-                                className="text-[12px] font-medium text-primary underline-offset-4 hover:underline"
-                              >
-                                What’s moving lately
-                              </button>
-                              {(h.thesis || (h.bullCase?.length ?? 0) > 0) && (
-                                <span className="text-[11px] text-faint">
-                                  Open “Walk through stocks” for the full read
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
-                      {(h.todoItems?.length ?? 0) > 0 && (
-                        <div className="border-t px-3.5 py-3">
-                          <div className="text-[11px] uppercase tracking-wide text-faint">
-                            To-do
-                          </div>
-                          <ul className="mt-2 space-y-1.5">
-                            {(h.todoItems ?? []).map((task, ti) => (
-                              <li
-                                key={ti}
-                                className="flex gap-2.5 text-[12.5px] leading-relaxed"
-                              >
-                                <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
-                                  {ti + 1}
-                                </span>
-                                <span>{task}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Potential additions */}
-            {report.actionPlan.potentialAdditions && report.actionPlan.potentialAdditions.length > 0 && (
-              <div className="px-5 py-4">
-                <h3 className="text-[13px] font-semibold">
-                  Stocks and ETFs to research next
-                </h3>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  Symbols for your watchlist. Informational only, not a
-                  recommendation to buy or sell. Verify against your plan,
-                  costs, and tax situation.
-                </p>
-                <div className="mt-3 space-y-2.5">
-                  {report.actionPlan.potentialAdditions.map((a, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 border bg-background p-3.5"
-                    >
-                      {a.ticker ? (
-                        <Badge
-                          variant="secondary"
-                          className="shrink-0 font-mono font-semibold"
-                        >
-                          {a.ticker}
-                        </Badge>
-                      ) : (
-                        <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 stroke-[1.6] text-faint" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium">
-                          {a.suggestion}
-                        </div>
-                        <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-                          {a.rationale}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+            {/* Rebalancing steps — always visible */}
+            {report.actionPlan.rebalancingSteps &&
+              report.actionPlan.rebalancingSteps.length > 0 && (
+                <div className="px-5 py-4">
+                  <h3 className="text-[13px] font-semibold">Rebalancing steps</h3>
+                  <ol className="mt-3 space-y-2">
+                    {report.actionPlan.rebalancingSteps.map((step, i) => (
+                      <li
+                        key={i}
+                        className="flex gap-3 border bg-background p-3.5 text-[12.5px] leading-relaxed"
+                      >
+                        <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
+                          {i + 1}
+                        </span>
+                        <span className="text-muted-foreground">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
-              </div>
-            )}
-
-            {/* Rebalancing steps */}
-            {report.actionPlan.rebalancingSteps && report.actionPlan.rebalancingSteps.length > 0 && (
-              <div className="px-5 py-4">
-                <h3 className="text-[13px] font-semibold">Rebalancing steps</h3>
-                <ol className="mt-3 space-y-2">
-                  {report.actionPlan.rebalancingSteps.map((step, i) => (
-                    <li
-                      key={i}
-                      className="flex gap-3 border bg-background p-3.5 text-[12.5px] leading-relaxed"
-                    >
-                      <span className="shrink-0 font-mono text-[11px] font-semibold text-faint">
-                        {i + 1}
-                      </span>
-                      <span className="text-muted-foreground">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
+              )}
           </div>
         </div>
       )}

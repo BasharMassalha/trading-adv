@@ -1,17 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topnav } from "@/components/layout/topnav";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
+import { isTrialAllowedPath } from "@/components/layout/nav-config";
+
+type AppShellProps = {
+  children: React.ReactNode;
+  isGuest?: boolean;
+};
 
 /**
  * Full app chrome (sidebar + top nav) for all routes except onboarding,
  * where we show only the wizard so users stay focused on the questions.
+ * Guests get a slim trial chrome (Import → Portfolio → Analysis).
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, isGuest = false }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isOnboarding =
     pathname === "/onboarding" || pathname?.startsWith("/onboarding/");
@@ -19,6 +27,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isGuest || !pathname) return;
+    if (isTrialAllowedPath(pathname)) return;
+    router.replace("/portfolio/upload?trial=true");
+  }, [isGuest, pathname, router]);
 
   if (isOnboarding) {
     return (
@@ -28,13 +42,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full">
-      <Sidebar />
+      <Sidebar isGuest={isGuest} />
       <MobileNavDrawer
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
+        isGuest={isGuest}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topnav onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <Topnav
+          onOpenMobileNav={() => setMobileNavOpen(true)}
+          isGuest={isGuest}
+        />
         <main className="flex-1 px-4 pb-16 pt-5 md:px-8 md:pb-[70px] md:pt-[26px]">
           {children}
         </main>

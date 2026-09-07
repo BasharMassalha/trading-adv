@@ -81,7 +81,7 @@ export type ParsedHolding = z.infer<typeof parsedHoldingSchema>;
 // ---------------------------------------------------------------------------
 
 export const parseResultSchema = z.object({
-  sourceType: z.enum(["CSV", "IMAGE"]),
+  sourceType: z.enum(["CSV", "IMAGE", "MANUAL"]),
   filename: z.string(),
   holdings: z.array(parsedHoldingSchema),
   warnings: z.array(z.string()),

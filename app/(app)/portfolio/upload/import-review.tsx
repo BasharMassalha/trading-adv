@@ -15,6 +15,7 @@ import {
   FileText,
   ImageIcon,
   Info,
+  Pencil,
 } from "lucide-react";
 import { parsedHoldingSchema, type ParseResult } from "@/lib/portfolio/parsed-holding";
 import { Button } from "@/components/ui/button";
@@ -89,18 +90,28 @@ const textInputClass =
 export function ImportReview({
   result,
   onBack,
+  portfolioId,
+  initialName,
 }: {
   result: ParseResult;
   onBack: () => void;
+  /** When set, confirm replaces holdings on this portfolio instead of creating a new one. */
+  portfolioId?: string;
+  /** Prefer this over deriving a name from the filename (edit / re-import flows). */
+  initialName?: string;
 }) {
   const router = useRouter();
+  const isEditing = Boolean(portfolioId);
 
   // Derive a sensible default name from the filename
-  const defaultName = result.filename
-    .replace(/\.[^.]+$/, "")   // strip extension
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim() || "My Portfolio";
+  const defaultName =
+    initialName?.trim() ||
+    result.filename
+      .replace(/\.[^.]+$/, "") // strip extension
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim() ||
+    "My Portfolio";
 
   const {
     register,
@@ -134,6 +145,7 @@ export function ImportReview({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        portfolioId: portfolioId || undefined,
         portfolioName: values.portfolioName,
         source: result.sourceType,
         baseCurrency: "USD",
@@ -143,9 +155,10 @@ export function ImportReview({
 
     const json = await res.json();
     if (!res.ok || !json.ok) {
-      // Surface error without crashing — show it via an alert for now.
-      // In a real app this would go into a toast or an error field.
-      window.alert(json?.error?.message ?? "Failed to save portfolio. Please try again.");
+      window.alert(
+        json?.error?.message ??
+          "Failed to save portfolio. Please try again.",
+      );
       return;
     }
 
@@ -154,6 +167,14 @@ export function ImportReview({
   }
 
   const hasWarnings = result.warnings.length > 0;
+
+  const sourceBadge =
+    result.sourceType === "CSV"
+      ? { icon: FileText, label: "CSV import" }
+      : result.sourceType === "IMAGE"
+        ? { icon: ImageIcon, label: "AI extraction" }
+        : { icon: Pencil, label: "Manual edit" };
+  const SourceIcon = sourceBadge.icon;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -166,22 +187,22 @@ export function ImportReview({
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-3 w-3" />
-            Back to upload
+            {isEditing ? "Back to portfolio" : "Back to upload"}
           </button>
         }
-        title="Review holdings"
-        description="Check the extracted data, edit any cells, then confirm to save."
+        title={isEditing ? "Edit holdings" : "Review holdings"}
+        description={
+          isEditing
+            ? "Update shares, costs, or tickers. Saving replaces the current holdings in this portfolio."
+            : "Check the extracted data, edit any cells, then confirm to save."
+        }
       />
 
       {/* ── Source badge row ───────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">
-          {result.sourceType === "CSV" ? (
-            <FileText className="h-3 w-3" />
-          ) : (
-            <ImageIcon className="h-3 w-3" />
-          )}
-          {result.sourceType === "CSV" ? "CSV import" : "AI extraction"}
+          <SourceIcon className="h-3 w-3" />
+          {sourceBadge.label}
         </Badge>
         <Badge variant="outline">
           <span className="font-mono">{fields.length}</span> holdings
@@ -233,7 +254,9 @@ export function ImportReview({
             )}
           </div>
           <p className="pb-1.5 text-[12px] text-muted-foreground">
-            You can rename it later from the portfolio settings.
+            {isEditing
+              ? "Name is updated when you save."
+              : "You can rename it later from the portfolio settings."}
           </p>
         </CardContent>
       </Card>
@@ -248,10 +271,12 @@ export function ImportReview({
                 Click any cell to edit. All fields except ticker are optional.
               </CardDescription>
             </div>
-            <span className="flex items-start gap-1.5 text-[11.5px] text-faint">
-              <Info className="mt-px h-3.5 w-3.5 shrink-0" />
-              Columns showing were not found in the source file.
-            </span>
+            {!isEditing && (
+              <span className="flex items-start gap-1.5 text-[11.5px] text-faint">
+                <Info className="mt-px h-3.5 w-3.5 shrink-0" />
+                Columns showing were not found in the source file.
+              </span>
+            )}
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0 pb-4">
@@ -423,7 +448,9 @@ export function ImportReview({
 
           {fields.length === 0 && (
             <div className="mx-4 mt-4 border border-dashed bg-background p-8 text-center text-[12.5px] text-muted-foreground">
-              No holdings. Add rows manually, or go back and re-upload.
+              {isEditing
+                ? "No holdings. Add rows manually to rebuild this portfolio."
+                : "No holdings. Add rows manually, or go back and re-upload."}
             </div>
           )}
 
@@ -476,13 +503,14 @@ export function ImportReview({
       <div className="flex flex-wrap items-center gap-3 border bg-surface p-4">
         <div className="flex-1">
           <p className="text-[13px] font-medium">
-            Ready to import <span className="font-mono">{fields.length}</span>{" "}
-            holding
+            {isEditing ? "Save" : "Ready to import"}{" "}
+            <span className="font-mono">{fields.length}</span> holding
             {fields.length === 1 ? "" : "s"}?
           </p>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Holdings will be saved to a new portfolio. You can re-import at
-            any time.
+            {isEditing
+              ? "Existing holdings in this portfolio will be replaced with the table above."
+              : "Holdings will be saved to a new portfolio. You can edit or re-import at any time."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -503,7 +531,7 @@ export function ImportReview({
             ) : (
               <>
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Confirm import
+                {isEditing ? "Save changes" : "Confirm import"}
               </>
             )}
           </Button>

@@ -37,6 +37,14 @@ export default async function PortfolioListPage() {
   // Load user's portfolios
   const portfolios = await portfolioRepository.listByUser(session.userId);
 
+  // Guests only get one book — skip the multi-portfolio list chrome
+  if (session.isGuest) {
+    if (portfolios.length === 0) {
+      redirect("/portfolio/upload?trial=true");
+    }
+    redirect(`/portfolio/${portfolios[0].id}`);
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader

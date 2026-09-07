@@ -4,24 +4,30 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
-import { NAV_GROUPS, isNavActive } from "@/components/layout/nav-config";
+import {
+  NAV_GROUPS,
+  TRIAL_NAV_GROUPS,
+  isNavActive,
+} from "@/components/layout/nav-config";
 
 type NavLinksProps = {
   onNavigate?: () => void;
+  isGuest?: boolean;
 };
 
-export function NavLinks({ onNavigate }: NavLinksProps) {
+export function NavLinks({ onNavigate, isGuest = false }: NavLinksProps) {
   const pathname = usePathname();
   const beginNavigation = useBeginNavigation();
+  const groups = isGuest ? TRIAL_NAV_GROUPS : NAV_GROUPS;
 
   return (
     <>
-      {NAV_GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.label} className="mb-1">
           <div className="px-2.5 pb-1.5 pt-3 text-[11px] text-faint">
             {group.label}
           </div>
-          {group.items.map(({ label, href, icon: Icon }) => {
+          {group.items.map(({ label, href, icon: Icon, step }) => {
             const active = isNavActive(pathname, href);
             return (
               <Link
@@ -39,12 +45,26 @@ export function NavLinks({ onNavigate }: NavLinksProps) {
                     : "border-transparent text-muted-foreground hover:bg-background hover:text-foreground",
                 )}
               >
-                <Icon
-                  className={cn(
-                    "h-[15px] w-[15px] shrink-0 stroke-[1.6]",
-                    active ? "text-primary" : "text-faint",
-                  )}
-                />
+                {step != null ? (
+                  <span
+                    className={cn(
+                      "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm border font-mono text-[10px] leading-none",
+                      active
+                        ? "border-primary/40 bg-primary text-primary-foreground"
+                        : "border-border-strong text-faint",
+                    )}
+                    aria-hidden
+                  >
+                    {step}
+                  </span>
+                ) : (
+                  <Icon
+                    className={cn(
+                      "h-[15px] w-[15px] shrink-0 stroke-[1.6]",
+                      active ? "text-primary" : "text-faint",
+                    )}
+                  />
+                )}
                 <span className="truncate">{label}</span>
               </Link>
             );

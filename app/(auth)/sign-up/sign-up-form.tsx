@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { LoadingOverlay } from "@/components/loading/loading-overlay";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 
 export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fromTrial = searchParams.get("from") === "trial";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -35,7 +37,12 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
       if (!res.ok || !json.ok) {
         throw new Error(json?.error?.message ?? "Failed to create account");
       }
-      router.push("/onboarding");
+      const next = searchParams.get("next");
+      const redirectTo =
+        (typeof json.data?.redirectTo === "string" && json.data.redirectTo) ||
+        next ||
+        "/onboarding";
+      router.push(redirectTo);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create account");
@@ -45,6 +52,11 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
 
   return (
     <div className="space-y-4">
+      {fromTrial ? (
+        <p className="border border-border-strong bg-background px-3 py-2 text-[12.5px] text-muted-foreground">
+          Create an account to keep your trial portfolio and analysis.
+        </p>
+      ) : null}
       {googleEnabled ? (
         <div className="space-y-3">
           <GoogleSignInButton label="Sign up with Google" />

@@ -15,6 +15,7 @@
  */
 
 import { getVisionProvider, VisionProviderError, type VisionErrorCode } from "@/lib/vision";
+import { fillMissingAverageCostFromPrice } from "./normalize-holdings";
 import type { ParseResult } from "./parsed-holding";
 
 export type ImageExtractResult = {
@@ -55,6 +56,8 @@ Rules:
 - Strip currency symbols and commas from numbers.
 - For negative numbers shown in parentheses, use a negative number.
 - If a field is not visible or unclear, omit it (do not guess).
+- If average cost is not shown but a per-share price is visible, set both
+  currentPrice and averageCost to that price (many portfolios omit avg cost).
 `.trim();
 
 /**
@@ -86,9 +89,24 @@ export async function extractHoldingsFromImage(
       filename,
     });
 
+    const holdings = fillMissingAverageCostFromPrice(result.holdings);
+    const filledFromPrice = holdings.filter(
+      (h, i) =>
+        result.holdings[i]?.averageCost == null &&
+        h.averageCost != null &&
+        h.currentPrice != null,
+    ).length;
+
+    const warnings = [...result.warnings];
+    if (filledFromPrice > 0) {
+      warnings.push(
+        `Used market price as average cost for ${filledFromPrice} holding(s) where avg cost was missing.`,
+      );
+    }
+
     return {
-      holdings: result.holdings,
-      warnings: result.warnings,
+      holdings,
+      warnings,
       status: result.status,
       provider: result.provider,
       confidence: result.confidence,

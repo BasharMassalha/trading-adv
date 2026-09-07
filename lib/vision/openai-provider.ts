@@ -77,6 +77,7 @@ Rules:
 - Include ONLY rows that represent actual holdings
 - Omit any field that is not clearly visible
 - Use null for fields you cannot read
+- If average cost is not shown but a per-share price column is visible, set BOTH currentPrice and averageCost to that price (many portfolios omit avg cost)
 - Return {"holdings": [], "notes": "reason"} if no holdings found`;
 
 // ---------------------------------------------------------------------------
@@ -137,12 +138,19 @@ function normalizeRawHolding(raw: RawHoldingFromModel): ParsedHolding | null {
     return null;
   }
 
+  const currentPrice = parseNumericField(raw.currentPrice);
+  let averageCost = parseNumericField(raw.averageCost);
+  // Many broker UIs show only a price column — treat it as cost basis too.
+  if (averageCost == null && currentPrice != null) {
+    averageCost = currentPrice;
+  }
+
   const holding: ParsedHolding = {
     ticker: raw.ticker.trim().toUpperCase(),
     companyName: raw.companyName?.trim() || null,
     shares: parseNumericField(raw.shares),
-    averageCost: parseNumericField(raw.averageCost),
-    currentPrice: parseNumericField(raw.currentPrice),
+    averageCost,
+    currentPrice,
     marketValue: parseNumericField(raw.marketValue),
     gainLoss: parseNumericField(raw.gainLoss),
     currency: raw.currency?.trim().toUpperCase() || "USD",

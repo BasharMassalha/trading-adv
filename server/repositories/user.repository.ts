@@ -27,4 +27,20 @@ export const userRepository = {
   update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
     return prisma.user.update({ where: { id }, data });
   },
+
+  delete(id: string): Promise<User> {
+    return prisma.user.delete({ where: { id } });
+  },
+
+  async isGuestActive(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isGuest: true, guestExpiresAt: true },
+    });
+    if (!user?.isGuest) return false;
+    if (user.guestExpiresAt && user.guestExpiresAt.getTime() < Date.now()) {
+      return false;
+    }
+    return true;
+  },
 };

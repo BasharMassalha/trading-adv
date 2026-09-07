@@ -38,6 +38,19 @@ export async function POST(req: NextRequest) {
       { status: 401 },
     );
   }
+  if (session.isGuest) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "TRIAL_SIGNUP_REQUIRED",
+          message:
+            "Create a free account to save your analysis and unlock voice briefings.",
+        },
+      },
+      { status: 401 },
+    );
+  }
 
   const env = serverEnv();
   const apiKey = env.OPENAI_API_KEY?.trim();

@@ -1,18 +1,28 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { BrandLockup } from "@/components/brand";
 import { NavLinks } from "@/components/layout/nav-links";
+import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 
 type MobileNavDrawerProps = {
   open: boolean;
   onClose: () => void;
+  isGuest?: boolean;
 };
 
-export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
+export function MobileNavDrawer({
+  open,
+  onClose,
+  isGuest = false,
+}: MobileNavDrawerProps) {
+  const begin = useBeginNavigation();
+
   useEffect(() => {
     if (!open) return;
 
@@ -49,7 +59,10 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
         )}
       >
         <div className="flex h-14 items-center justify-between border-b px-3">
-          <BrandLockup size="sm" />
+          <div className="flex items-center gap-2">
+            <BrandLockup size="sm" />
+            {isGuest ? <Badge variant="info">Trial</Badge> : null}
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -61,14 +74,33 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          <NavLinks onNavigate={onClose} />
+          <NavLinks isGuest={isGuest} onNavigate={onClose} />
         </nav>
 
-        <div className="border-t px-5 py-3 text-[11px] leading-relaxed text-faint">
-          Analysis is evidence-led and cited.
-          <br />
-          Nothing executes without you.
-        </div>
+        {isGuest ? (
+          <div className="space-y-3 border-t px-5 py-3">
+            <p className="text-[11px] leading-relaxed text-faint">
+              One free analysis. Sign up to save your work.
+            </p>
+            <Button size="sm" className="w-full" asChild>
+              <Link
+                href="/sign-up?from=trial"
+                onClick={() => {
+                  begin();
+                  onClose();
+                }}
+              >
+                Keep your analysis
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="border-t px-5 py-3 text-[11px] leading-relaxed text-faint">
+            Analysis is evidence-led and cited.
+            <br />
+            Nothing executes without you.
+          </div>
+        )}
       </aside>
     </>
   );

@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthAppUrl } from "@/lib/auth-app-url";
-import { exchangeGoogleAuthCode, fetchGoogleUserInfo, isGoogleOAuthConfigured } from "@/lib/google-oauth";
+import {
+  exchangeGoogleAuthCode,
+  fetchGoogleUserInfo,
+  isGoogleOAuthConfigured,
+} from "@/lib/google-oauth";
 import { authService } from "@/server/services/auth.service";
 
 export const dynamic = "force-dynamic";
@@ -46,14 +50,10 @@ export async function GET(request: NextRequest) {
     const tokens = await exchangeGoogleAuthCode(code);
     const userInfo = await fetchGoogleUserInfo(tokens.access_token);
     const result = await authService.signInWithGoogle(userInfo);
-    if (result.isNew) {
-      return redirectTo("/onboarding");
-    }
-    return redirectTo("/dashboard");
+    return redirectTo(result.redirectTo);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Google sign-in failed";
     console.error("[google/callback]", msg);
-    // Do not add error text to the URL (referrers, browser history, logs).
     return redirectTo("/sign-in?error=google_signin");
   }
 }

@@ -46,6 +46,8 @@ import { EmptyPortfolioDetail } from "@/components/empty-states";
 import { EnrichButton } from "./enrich-button";
 import { DeletePortfolioButton } from "./delete-portfolio-button";
 import { RenamePortfolioButton } from "./rename-portfolio-button";
+import { portfolioRepository } from "@/server/repositories/portfolio.repository";
+import { GuestTrialBanner } from "@/components/auth/guest-trial-banner";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Portfolio" };
@@ -79,6 +81,11 @@ export default async function PortfolioViewPage({
     return <EmptyPortfolioDetail />;
   }
 
+  const owned = await portfolioRepository.findById(params.id);
+  if (!owned || owned.userId !== session.userId) {
+    return <EmptyPortfolioDetail />;
+  }
+
   const isEnriched = view.lastEnrichedAt != null;
   const needsEnrichment = !isEnriched;
 
@@ -106,15 +113,16 @@ export default async function PortfolioViewPage({
 
   return (
     <div className="space-y-5">
+      {session.isGuest ? <GuestTrialBanner variant="portfolio" /> : null}
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <PageHeader
         eyebrow={
           <Link
-            href="/dashboard"
+            href={session.isGuest ? "/portfolio/upload?trial=true" : "/dashboard"}
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-3 w-3" />
-            Dashboard
+            {session.isGuest ? "Import" : "Dashboard"}
           </Link>
         }
         title={view.name}
@@ -126,19 +134,34 @@ export default async function PortfolioViewPage({
         actions={
           <>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/portfolio/upload">Re-import</Link>
+              <Link
+                href={
+                  session.isGuest
+                    ? "/portfolio/upload?trial=true"
+                    : `/portfolio/upload?portfolioId=${encodeURIComponent(params.id)}`
+                }
+              >
+                Re-import
+              </Link>
             </Button>
             <Button size="sm" asChild>
               <Link href={`/advisor?portfolio=${encodeURIComponent(params.id)}`}>
                 <Sparkles className="h-3.5 w-3.5" />
-                AI advisor
+                {session.isGuest ? "Run analysis" : "AI advisor"}
               </Link>
             </Button>
-            <RenamePortfolioButton
-              portfolioId={params.id}
-              portfolioName={view.name}
-            />
-            <DeletePortfolioButton portfolioId={params.id} portfolioName={view.name} />
+            {!session.isGuest ? (
+              <>
+                <RenamePortfolioButton
+                  portfolioId={params.id}
+                  portfolioName={view.name}
+                />
+                <DeletePortfolioButton
+                  portfolioId={params.id}
+                  portfolioName={view.name}
+                />
+              </>
+            ) : null}
             <EnrichButton
               portfolioId={params.id}
               lastEnrichedAt={view.lastEnrichedAt}
@@ -218,16 +241,23 @@ export default async function PortfolioViewPage({
 
         {/* Holdings table */}
         <TabsContent value="holdings" className="space-y-3">
-          <div className="space-y-1">
-            <SectionTitle>Holdings</SectionTitle>
-            <p className="text-[12px] text-muted-foreground">
-              All positions sorted by market value.
-              {!isEnriched && (
-                <span className="ml-1 text-warning">
-                  Prices not yet loaded. Refresh to see live values.
-                </span>
-              )}
-            </p>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="space-y-1">
+              <SectionTitle>Holdings</SectionTitle>
+              <p className="text-[12px] text-muted-foreground">
+                All positions sorted by market value.
+                {!isEnriched && (
+                  <span className="ml-1 text-warning">
+                    Prices not yet loaded. Refresh to see live values.
+                  </span>
+                )}
+              </p>
+            </div>
+            {!session.isGuest ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/portfolio/${params.id}/edit`}>Edit</Link>
+              </Button>
+            ) : null}
           </div>
 
           <Table>

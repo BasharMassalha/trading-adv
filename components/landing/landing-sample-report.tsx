@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { TryFreeAnalysisButton } from "@/components/landing/try-free-analysis-button";
 
 /** Static sample — mirrors the shape of a real generated report. */
 const SAMPLE = {
@@ -238,9 +239,9 @@ export function LandingSampleReport() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 border-t px-5 py-5">
-            <Button asChild>
-              <Link href="/sign-up">Generate this for your book</Link>
-            </Button>
+            <TryFreeAnalysisButton tone="inline">
+              Analyse your book free
+            </TryFreeAnalysisButton>
             <Button variant="outline" asChild>
               <Link href="/dashboard">Open the worked example</Link>
             </Button>
