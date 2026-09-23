@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { NavigationLoadingProvider } from "@/components/loading/navigation-loading-context";
 import { clientEnv } from "@/lib/env";
+import { Analytics } from "@vercel/analytics/next";
 
 const sans = Inter_Tight({
   subsets: ["latin"],
@@ -52,6 +53,7 @@ export default function RootLayout({
         >
           <NavigationLoadingProvider>{children}</NavigationLoadingProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
