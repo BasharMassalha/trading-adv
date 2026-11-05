@@ -20,8 +20,8 @@ function cronAuthorized(req: NextRequest): boolean {
 
 /**
  * GET /api/cron/trading-agent
- * Vercel calls this every 15 minutes. No user session. Agents already run
- * inside that window are skipped.
+ * Vercel Hobby-safe schedule: once per day (14:00 UTC). No user session.
+ * Active agents due for a pass are run; others are skipped.
  */
 export const GET = withErrorHandling(async (req: NextRequest) => {
   if (!process.env.CRON_SECRET) {

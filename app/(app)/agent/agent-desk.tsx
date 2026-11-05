@@ -143,11 +143,11 @@ export function AgentDesk({ overview }: AgentDeskProps) {
 
       <div className="border bg-surface px-5 py-4 text-[12.5px] leading-relaxed text-muted-foreground">
         An active agent keeps working when you are signed out. On a machine
-        running this app, the loop starts with the server and re-analyzes about
-        every 15 minutes. On Vercel the same pass is scheduled every 15 minutes
-        once <span className="font-mono text-[11.5px]">CRON_SECRET</span> is set.
-        Pause stops it. Fills stay inside this app, at the latest quote, and the
-        portfolio you imported is left unchanged. Run now forces a pass immediately.
+        running this app, the loop re-analyzes about every 15 minutes. On Vercel
+        Hobby, one background pass runs daily at 14:00 UTC once{" "}
+        <span className="font-mono text-[11.5px]">CRON_SECRET</span> is set.
+        While you are signed in, prices refresh about every minute. Pause stops
+        the agent. Run now forces a full pass immediately.
       </div>
 
       {error ? (
