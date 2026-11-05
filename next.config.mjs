@@ -4,9 +4,24 @@ const nextConfig = {
   /** Hide framework fingerprint on responses */
   poweredByHeader: false,
   experimental: {
+    instrumentationHook: true,
+    // yahoo-finance2 pulls @deno/shim-deno (Node `net`). Keep it external so
+    // webpack does not try to bundle it into instrumentation / server graphs.
+    serverComponentsExternalPackages: ["yahoo-finance2"],
     serverActions: {
       bodySizeLimit: "10mb",
     },
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Instrumentation is not covered by serverComponentsExternalPackages alone.
+      const prev = config.externals;
+      config.externals = [
+        ...(Array.isArray(prev) ? prev : prev ? [prev] : []),
+        "yahoo-finance2",
+      ];
+    }
+    return config;
   },
   images: {
     // Any HTTPS image URL (e.g. broker icons, avatars). Tighten remotePatterns

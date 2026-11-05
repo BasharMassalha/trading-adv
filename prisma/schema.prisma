@@ -30,6 +30,7 @@ model User {
   portfolios        Portfolio[]
   aiReports         AIReport[]
   investmentProfile UserInvestmentProfile?
+  tradingAgents     TradingAgent[]
 
   @@index([email])
   @@index([isGuest, guestExpiresAt])
@@ -122,6 +123,10 @@ model Portfolio {
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   holdings  PortfolioHolding[]
   aiReports AIReport[]
+  /// Set when this portfolio is the book an agent trades
+  tradingAgent TradingAgent? @relation("AgentBook")
+  /// Set when this portfolio was cloned to seed an agent book
+  tradingAgentSources TradingAgent[] @relation("AgentSource")
 
   @@index([userId])
 }
@@ -254,4 +259,81 @@ model AIReport {
   @@index([userId])
   @@index([portfolioId])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Trading agent — paper book that runs analysis and applies the resulting trades
+// ---------------------------------------------------------------------------
+
+enum TradingAgentStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum AgentRunStatus {
+  RUNNING
+  COMPLETED
+  NO_TRADE
+  FAILED
+}
+
+/// One agent per source portfolio. It trades `portfolio` (a cloned book), never the source.
+model TradingAgent {
+  id                String             @id @default(cuid())
+  userId            String
+  sourcePortfolioId String
+  portfolioId       String             @unique
+  status            TradingAgentStatus @default(ACTIVE)
+  /// MAXIMIZE_RETURN — rotate into the highest-conviction ideas under a position cap
+  mandate           String             @default("MAXIMIZE_RETURN")
+  /// Max fraction of book value in a single name (0.1200 = 12%)
+  maxPositionWeight Decimal            @default(0.12) @db.Decimal(6, 4)
+  lastRunAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book   Portfolio  @relation("AgentBook", fields: [portfolioId], references: [id], onDelete: Cascade)
+  source Portfolio  @relation("AgentSource", fields: [sourcePortfolioId], references: [id], onDelete: Cascade)
+  runs   AgentRun[]
+
+  @@unique([userId, sourcePortfolioId])
+  @@index([userId])
+  @@index([status])
+}
+
+model AgentRun {
+  id                   String         @id @default(cuid())
+  agentId              String
+  status               AgentRunStatus @default(RUNNING)
+  summary              String?        @db.Text
+  error                String?        @db.Text
+  reportId             String?
+  /// Live notes and decisions written while the run is in progress
+  trace                Json?
+  portfolioValueBefore Decimal?       @db.Decimal(18, 4)
+  portfolioValueAfter  Decimal?       @db.Decimal(18, 4)
+  startedAt            DateTime       @default(now())
+  finishedAt           DateTime?
+
+  agent  TradingAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  orders AgentOrder[]
+
+  @@index([agentId, startedAt])
+}
+
+model AgentOrder {
+  id        String   @id @default(cuid())
+  runId     String
+  ticker    String
+  side      String
+  shares    Decimal  @db.Decimal(24, 8)
+  price     Decimal  @db.Decimal(18, 4)
+  notional  Decimal  @db.Decimal(18, 4)
+  reason    String   @db.Text
+  createdAt DateTime @default(now())
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
 }

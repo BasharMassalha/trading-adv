@@ -79,8 +79,8 @@ import type { AssetProfile, LatestQuote, HistoricalPricePoint } from "./types";
 /** Profile cache — 1 hour TTL (company info changes rarely) */
 export const profileCache = new TTLCache<AssetProfile>(60 * 60 * 1000);
 
-/** Quote cache — 5 minute TTL (prices update frequently during market hours) */
-export const quoteCache = new TTLCache<LatestQuote>(5 * 60 * 1000);
+/** Quote cache — short TTL so the live pull is not stuck on a stale print */
+export const quoteCache = new TTLCache<LatestQuote>(45 * 1000);
 
 /** Historical cache — 1 hour TTL (daily candles only change once per day) */
 export const historyCache = new TTLCache<HistoricalPricePoint[]>(60 * 60 * 1000);

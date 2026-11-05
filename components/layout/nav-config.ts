@@ -7,6 +7,7 @@ import {
   LineChart,
   ShieldAlert,
   Users,
+  Bot,
 } from "lucide-react";
 
 export type NavItem = {
@@ -30,6 +31,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Portfolios", href: "/portfolio", icon: Briefcase },
       { label: "Upload", href: "/portfolio/upload", icon: Upload },
       { label: "AI advisor", href: "/advisor", icon: Brain },
+      { label: "Trading agent", href: "/agent", icon: Bot },
     ],
   },
   {

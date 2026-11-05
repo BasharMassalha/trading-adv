@@ -247,6 +247,8 @@ export const portfolioService = {
           { quantity: existing.quantity, averageCost: existing.averageCost },
           { side: tx.side, shares: tx.shares, price: tx.price },
         );
+        const latestPrice =
+          existing.latestPrice ?? (tx.price > 0 ? tx.price : null);
         if (next.quantity <= 0) {
           lots.delete(symbol);
         } else {
@@ -255,6 +257,7 @@ export const portfolioService = {
             quantity: next.quantity,
             averageCost: next.averageCost,
             assetId: existing.assetId || assetBySymbol.get(symbol)!,
+            latestPrice,
           });
         }
       } catch (err) {

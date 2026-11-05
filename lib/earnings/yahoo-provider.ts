@@ -119,7 +119,8 @@ export class YahooEarningsProvider implements IEarningsProvider {
 
   private async getYF(): Promise<YahooFinanceClient> {
     if (!this._yf) {
-      const yfModule = await import("yahoo-finance2");
+      // webpackIgnore: leave for Node require(); bundling pulls in `net` via @deno/shim-deno
+      const yfModule = await import(/* webpackIgnore: true */ "yahoo-finance2");
       const YahooFinance = yfModule.default;
       if (typeof YahooFinance === "function" && (YahooFinance as { prototype?: unknown }).prototype) {
         this._yf = new (YahooFinance as new () => YahooFinanceClient)();

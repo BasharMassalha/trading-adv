@@ -179,8 +179,9 @@ export default async function PortfolioViewPage({
               Market data not yet loaded
             </p>
             <p className="mt-1 leading-relaxed text-muted-foreground">
-              Choose &ldquo;Refresh market data&rdquo; above to fetch live prices,
-              sector data, and 1-year price history for all your holdings.
+              Prices load on their own about once a minute. Use &ldquo;Refresh
+              market data&rdquo; when you also want sector details and a year of
+              price history.
             </p>
           </div>
         </div>

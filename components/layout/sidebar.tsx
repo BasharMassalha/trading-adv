@@ -44,7 +44,7 @@ export function Sidebar({ isGuest = false }: SidebarProps) {
         <div className="mt-auto border-t px-2.5 pb-1 pt-3 text-[11px] leading-relaxed text-faint">
           Analysis is evidence-led and cited.
           <br />
-          Nothing executes without you.
+          Agent trades stay inside a book you arm.
         </div>
       )}
     </aside>

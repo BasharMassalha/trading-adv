@@ -197,7 +197,8 @@ export class YahooFinanceProvider implements IMarketDataProvider {
 
   private async getYF(): Promise<YahooFinanceClient> {
     if (!this._yf) {
-      const yfModule = await import("yahoo-finance2");
+      // webpackIgnore: leave for Node require(); bundling pulls in `net` via @deno/shim-deno
+      const yfModule = await import(/* webpackIgnore: true */ "yahoo-finance2");
       // yahoo-finance2 v2.x requires instantiation with new YahooFinance()
       // Check if it's the new API (class-based) or old API (direct default export)
       const YahooFinance = yfModule.default;

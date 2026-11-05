@@ -190,6 +190,35 @@ export const enrichmentService = {
     // This is safer for free API tiers like Yahoo Finance
     for (const holding of portfolio.holdings) {
       const symbol = holding.asset.symbol;
+
+      // Cash is a sleeve inside the book, priced at $1. Never ask a market
+      // data vendor to quote it — a bad print would rewrite the cash balance.
+      if (symbol.toUpperCase() === "CASH" || holding.asset.type === "CASH") {
+        const qty = toNum(holding.quantity) ?? 0;
+        await prisma.asset.update({
+          where: { id: holding.assetId },
+          data: {
+            type: "CASH",
+            name: "Cash",
+            latestPrice: 1,
+            priceChange: 0,
+            priceChangePercent: 0,
+            lastEnrichedAt: new Date(),
+          },
+        });
+        fetched.push({
+          holdingId: holding.id,
+          assetId: holding.assetId,
+          symbol,
+          quantity: qty,
+          averageCost: toNum(holding.averageCost),
+          price: 1,
+          change: 0,
+          changePercent: 0,
+        });
+        continue;
+      }
+
       const lastEnriched = holding.asset.lastEnrichedAt;
 
       // Skip recently enriched assets unless force refresh
