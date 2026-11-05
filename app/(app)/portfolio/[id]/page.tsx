@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
+import { isCashSymbol } from "@/lib/portfolio/cash";
 import { computeRiskScore } from "@/lib/portfolio/risk-score";
 import { RiskScoreCard } from "@/components/dashboard/risk-score-card";
 import {
@@ -420,6 +421,7 @@ export default async function PortfolioViewPage({
 // ---------------------------------------------------------------------------
 
 function HoldingRow({ holding: h }: { holding: HoldingView }) {
+  const cash = isCashSymbol(h.symbol) || h.type === "CASH";
   const gainPositive = (h.unrealizedGainLoss ?? 0) >= 0;
 
   return (
@@ -427,7 +429,12 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
       <TableCell>
         <div className="flex items-center gap-2">
           <span className="font-mono text-[13px] font-semibold">{h.symbol}</span>
-          {!h.isEnriched && (
+          {cash ? (
+            <Badge variant="secondary" className="px-1 text-[10px] leading-4">
+              cash
+            </Badge>
+          ) : null}
+          {!h.isEnriched && !cash && (
             <Badge variant="outline" className="px-1 text-[10px] leading-4">
               no data
             </Badge>
@@ -438,7 +445,9 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
         </div>
       </TableCell>
       <TableCell className="hidden md:table-cell">
-        {h.sector ? (
+        {cash ? (
+          <span className="text-faint">Cash</span>
+        ) : h.sector ? (
           <span className="whitespace-nowrap rounded-md border bg-background px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
             {h.sector}
           </span>
@@ -446,12 +455,20 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
           <span className="text-faint">—</span>
         )}
       </TableCell>
-      <TableCell className="text-right font-mono">{h.quantity}</TableCell>
       <TableCell className="text-right font-mono">
-        {h.averageCost != null ? formatCurrency(h.averageCost) : "—"}
+        {cash ? formatCurrency(h.quantity) : h.quantity}
       </TableCell>
       <TableCell className="text-right font-mono">
-        {h.currentPrice != null ? (
+        {cash
+          ? formatCurrency(1)
+          : h.averageCost != null
+            ? formatCurrency(h.averageCost)
+            : "—"}
+      </TableCell>
+      <TableCell className="text-right font-mono">
+        {cash ? (
+          formatCurrency(1)
+        ) : h.currentPrice != null ? (
           <div>
             <div>{formatCurrency(h.currentPrice)}</div>
             {h.priceChangePercent != null && (
@@ -471,10 +488,16 @@ function HoldingRow({ holding: h }: { holding: HoldingView }) {
         )}
       </TableCell>
       <TableCell className="text-right font-mono font-medium">
-        {h.marketValue != null ? formatCurrency(h.marketValue) : "—"}
+        {h.marketValue != null
+          ? formatCurrency(h.marketValue)
+          : cash
+            ? formatCurrency(h.quantity)
+            : "—"}
       </TableCell>
       <TableCell className="whitespace-nowrap text-right font-mono">
-        {h.unrealizedGainLoss != null ? (
+        {cash ? (
+          <span className="text-faint">—</span>
+        ) : h.unrealizedGainLoss != null ? (
           <span className={gainPositive ? "text-success" : "text-destructive"}>
             {gainPositive ? "+" : ""}
             {formatCurrency(h.unrealizedGainLoss)}

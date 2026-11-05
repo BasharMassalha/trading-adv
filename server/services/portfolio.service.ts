@@ -7,6 +7,7 @@ import {
   CostBasisError,
   unrealizedGainLoss,
 } from "@/lib/portfolio/cost-basis";
+import { CASH_TICKER, isCashSymbol, normalizeCashHoldings } from "@/lib/portfolio/cash";
 import type { ParsedHolding } from "@/lib/portfolio/parsed-holding";
 import type { PortfolioSource } from "@prisma/client";
 import type { PortfolioTransactionInput } from "@/server/validators/portfolio-transaction.validator";
@@ -16,6 +17,30 @@ function toNum(v: { toNumber?: () => number } | number | null | undefined): numb
   if (typeof v === "number") return v;
   if (typeof v.toNumber === "function") return v.toNumber();
   return Number(v);
+}
+
+/** Cash sleeve: $1 per unit so quantity equals dollar balance. */
+async function ensureCashAsset(currency: string) {
+  return prisma.asset.upsert({
+    where: { symbol: CASH_TICKER },
+    create: {
+      symbol: CASH_TICKER,
+      name: "Cash",
+      type: "CASH",
+      currency,
+      latestPrice: 1,
+      priceChange: 0,
+      priceChangePercent: 0,
+      lastEnrichedAt: new Date(),
+    },
+    update: {
+      type: "CASH",
+      name: "Cash",
+      latestPrice: 1,
+      priceChange: 0,
+      priceChangePercent: 0,
+    },
+  });
 }
 
 export const portfolioService = {
@@ -54,8 +79,8 @@ export const portfolioService = {
       portfolioName,
       source,
       baseCurrency,
-      holdings,
     } = params;
+    const holdings = normalizeCashHoldings(params.holdings);
 
     // Upsert assets outside the interactive transaction. Neon (and other
     // remote Postgres) round-trips make sequential upserts exceed the
@@ -193,19 +218,22 @@ export const portfolioService = {
 
     // Ensure assets exist for every ticker (outside interactive tx)
     const assetBySymbol = new Map<string, string>();
+    const baseCurrency = portfolio.baseCurrency || "USD";
     for (const tx of transactions) {
       const symbol = tx.ticker.toUpperCase();
       if (assetBySymbol.has(symbol)) continue;
-      const asset = await prisma.asset.upsert({
-        where: { symbol },
-        create: {
-          symbol,
-          name: symbol,
-          type: "STOCK",
-          currency: portfolio.baseCurrency || "USD",
-        },
-        update: {},
-      });
+      const asset = isCashSymbol(symbol)
+        ? await ensureCashAsset(baseCurrency)
+        : await prisma.asset.upsert({
+            where: { symbol },
+            create: {
+              symbol,
+              name: symbol,
+              type: "STOCK",
+              currency: baseCurrency,
+            },
+            update: {},
+          });
       assetBySymbol.set(symbol, asset.id);
     }
 
@@ -234,21 +262,25 @@ export const portfolioService = {
 
     for (const tx of transactions) {
       const symbol = tx.ticker.toUpperCase();
+      const cash = isCashSymbol(symbol);
+      // Cash is always $1/unit — quantity is the dollar balance.
+      const fillPrice = cash ? 1 : tx.price;
       const existing = lots.get(symbol) ?? {
         assetId: assetBySymbol.get(symbol)!,
         quantity: 0,
         averageCost: null,
-        currency: portfolio.baseCurrency || "USD",
-        latestPrice: null,
+        currency: baseCurrency,
+        latestPrice: cash ? 1 : null,
       };
 
       try {
         const next = applyLotTransaction(
           { quantity: existing.quantity, averageCost: existing.averageCost },
-          { side: tx.side, shares: tx.shares, price: tx.price },
+          { side: tx.side, shares: tx.shares, price: fillPrice },
         );
-        const latestPrice =
-          existing.latestPrice ?? (tx.price > 0 ? tx.price : null);
+        const latestPrice = cash
+          ? 1
+          : existing.latestPrice ?? (fillPrice > 0 ? fillPrice : null);
         if (next.quantity <= 0) {
           lots.delete(symbol);
         } else {

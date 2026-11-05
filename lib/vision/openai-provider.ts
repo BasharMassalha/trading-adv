@@ -19,6 +19,11 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { parsedHoldingSchema, type ParsedHolding } from "@/lib/portfolio/parsed-holding";
+import {
+  looksLikeCashLabel,
+  normalizeCashHoldings,
+  toCashHolding,
+} from "@/lib/portfolio/cash";
 import type {
   IVisionProvider,
   VisionExtractionInput,
@@ -35,14 +40,15 @@ import { VisionProviderError } from "./types";
 const SYSTEM_PROMPT = `You are a precise financial data extraction assistant. Your task is to extract portfolio holdings from brokerage account screenshots.
 
 IMPORTANT RULES:
-1. Extract ONLY actual stock/ETF/fund holdings - rows representing individual positions
-2. IGNORE: totals, subtotals, summaries, cash balances, headers, footers, menus, ads, UI elements
-3. For each holding, extract ONLY values that are clearly visible and readable
-4. NEVER invent, estimate, or guess values - if a field is unclear or not visible, omit it
-5. Preserve exact decimal precision as shown in the image
-6. Handle negative numbers (losses) correctly - they may appear in parentheses or with minus signs
-7. Strip currency symbols ($, €, etc.) and commas from numbers
-8. Return ONLY valid JSON matching the exact schema - no markdown, no prose`;
+1. Extract stock/ETF/fund holdings AND any cash / sweep / money-market balance shown as a position
+2. IGNORE: portfolio totals, subtotals, account summaries, headers, footers, menus, ads, UI chrome
+3. For cash balances, use ticker "CASH", set shares to the dollar amount, currentPrice and averageCost to 1, and marketValue to the same dollar amount
+4. For each holding, extract ONLY values that are clearly visible and readable
+5. NEVER invent, estimate, or guess values - if a field is unclear or not visible, omit it
+6. Preserve exact decimal precision as shown in the image
+7. Handle negative numbers (losses) correctly - they may appear in parentheses or with minus signs
+8. Strip currency symbols ($, €, etc.) and commas from numbers
+9. Return ONLY valid JSON matching the exact schema - no markdown, no prose`;
 
 const USER_PROMPT = `Extract all portfolio holdings from this brokerage screenshot.
 
@@ -58,23 +64,34 @@ Return a JSON object with this exact structure:
       "marketValue": 18950.00,
       "gainLoss": 3925.00,
       "currency": "USD"
+    },
+    {
+      "ticker": "CASH",
+      "companyName": "Cash",
+      "shares": 2500.00,
+      "averageCost": 1,
+      "currentPrice": 1,
+      "marketValue": 2500.00,
+      "gainLoss": 0,
+      "currency": "USD"
     }
   ],
   "notes": "Any relevant extraction notes"
 }
 
 Field requirements:
-- ticker: Stock symbol (REQUIRED - skip row if not visible)
+- ticker: Stock symbol (REQUIRED - skip row if not visible). For cash use "CASH"
 - companyName: Full company/fund name (optional)
-- shares: Number of shares/units held (optional)
-- averageCost: Average cost per share (optional)
-- currentPrice: Current market price per share (optional)
-- marketValue: Total position value (optional)
-- gainLoss: Unrealized gain/loss (negative for losses) (optional)
+- shares: Number of shares/units held (optional). For cash, use the dollar balance
+- averageCost: Average cost per share (optional). For cash use 1
+- currentPrice: Current market price per share (optional). For cash use 1
+- marketValue: Total position value (optional). For cash, the dollar balance
+- gainLoss: Unrealized gain/loss (negative for losses) (optional). For cash use 0
 - currency: 3-letter ISO code, default "USD" (optional)
 
 Rules:
-- Include ONLY rows that represent actual holdings
+- Include stock/ETF/fund rows and cash / sweep balances
+- Do NOT include portfolio totals or account-value summary lines
 - Omit any field that is not clearly visible
 - Use null for fields you cannot read
 - If average cost is not shown but a per-share price column is visible, set BOTH currentPrice and averageCost to that price (many portfolios omit avg cost)
@@ -138,6 +155,16 @@ function normalizeRawHolding(raw: RawHoldingFromModel): ParsedHolding | null {
     return null;
   }
 
+  const ticker = raw.ticker.trim().toUpperCase();
+  const companyName = raw.companyName?.trim() || null;
+  const shares = parseNumericField(raw.shares);
+  const marketValue = parseNumericField(raw.marketValue);
+  const currency = raw.currency?.trim().toUpperCase() || "USD";
+
+  if (looksLikeCashLabel(ticker, companyName)) {
+    return toCashHolding({ shares, marketValue, currency });
+  }
+
   const currentPrice = parseNumericField(raw.currentPrice);
   let averageCost = parseNumericField(raw.averageCost);
   // Many broker UIs show only a price column — treat it as cost basis too.
@@ -146,14 +173,14 @@ function normalizeRawHolding(raw: RawHoldingFromModel): ParsedHolding | null {
   }
 
   const holding: ParsedHolding = {
-    ticker: raw.ticker.trim().toUpperCase(),
-    companyName: raw.companyName?.trim() || null,
-    shares: parseNumericField(raw.shares),
+    ticker,
+    companyName,
+    shares,
     averageCost,
     currentPrice,
-    marketValue: parseNumericField(raw.marketValue),
+    marketValue,
     gainLoss: parseNumericField(raw.gainLoss),
-    currency: raw.currency?.trim().toUpperCase() || "USD",
+    currency,
   };
 
   return holding;
@@ -396,9 +423,11 @@ export class OpenAIVisionProvider implements IVisionProvider {
       }
     }
 
+    const holdings = normalizeCashHoldings(validHoldings);
+
     // Determine status
     let status: VisionExtractionResult["status"] = "ok";
-    if (validHoldings.length === 0) {
+    if (holdings.length === 0) {
       status = "empty";
       warnings.push("No valid holdings could be extracted from the image");
     } else if (droppedRows > 0) {
@@ -410,13 +439,13 @@ export class OpenAIVisionProvider implements IVisionProvider {
 
     console.info("[vision:openai] Extraction complete:", {
       filename,
-      validHoldings: validHoldings.length,
+      validHoldings: holdings.length,
       droppedRows,
       status,
     });
 
     return {
-      holdings: validHoldings,
+      holdings,
       warnings,
       status,
       provider: this.name,

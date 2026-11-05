@@ -7,6 +7,7 @@
 
 import type { Prisma } from "@prisma/client";
 import type { ParsedHolding } from "./parsed-holding";
+import { isCashSymbol } from "./cash";
 
 /**
  * Build the Prisma `PortfolioHoldingCreateManyPortfolioInput` for a single
@@ -16,11 +17,20 @@ export function holdingToCreateInput(
   holding: ParsedHolding,
   assetId: string,
 ): Prisma.PortfolioHoldingCreateManyPortfolioInput {
+  const cash = isCashSymbol(holding.ticker);
+  const quantity = cash
+    ? (holding.shares ?? holding.marketValue ?? 0)
+    : (holding.shares ?? 0);
+
   return {
     assetId,
-    quantity: holding.shares ?? 0,
-    averageCost:
-      holding.averageCost != null ? holding.averageCost : undefined,
+    quantity,
+    averageCost: cash ? 1 : holding.averageCost != null ? holding.averageCost : undefined,
+    marketValue: cash
+      ? quantity
+      : holding.marketValue != null
+        ? holding.marketValue
+        : undefined,
     currency: holding.currency ?? "USD",
   };
 }
@@ -35,16 +45,32 @@ export function holdingToAssetUpsert(holding: ParsedHolding): {
   update: Prisma.AssetUpdateInput;
 } {
   const symbol = holding.ticker.toUpperCase();
+  const cash = isCashSymbol(symbol);
   return {
     where: { symbol },
     create: {
       symbol,
-      name: holding.companyName ?? symbol,
-      type: "STOCK",
+      name: cash ? "Cash" : (holding.companyName ?? symbol),
+      type: cash ? "CASH" : "STOCK",
       currency: holding.currency ?? "USD",
+      ...(cash
+        ? {
+            latestPrice: 1,
+            priceChange: 0,
+            priceChangePercent: 0,
+          }
+        : {}),
     },
     update: {
-      name: holding.companyName ?? undefined,
+      name: cash ? "Cash" : (holding.companyName ?? undefined),
+      ...(cash
+        ? {
+            type: "CASH" as const,
+            latestPrice: 1,
+            priceChange: 0,
+            priceChangePercent: 0,
+          }
+        : {}),
     },
   };
 }

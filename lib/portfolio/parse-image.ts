@@ -16,6 +16,7 @@
 
 import { getVisionProvider, VisionProviderError, type VisionErrorCode } from "@/lib/vision";
 import { fillMissingAverageCostFromPrice } from "./normalize-holdings";
+import { normalizeCashHoldings } from "./cash";
 import type { ParseResult } from "./parsed-holding";
 
 export type ImageExtractResult = {
@@ -52,7 +53,9 @@ Each object must have these keys:
 
 Rules:
 - Return ONLY the JSON array, no prose.
-- Skip header rows, totals, and cash positions.
+- Skip header rows and portfolio totals.
+- Include cash / sweep balances as ticker "CASH" with shares = dollar
+  amount, currentPrice/averageCost = 1, and marketValue = dollar amount.
 - Strip currency symbols and commas from numbers.
 - For negative numbers shown in parentheses, use a negative number.
 - If a field is not visible or unclear, omit it (do not guess).
@@ -89,12 +92,15 @@ export async function extractHoldingsFromImage(
       filename,
     });
 
-    const holdings = fillMissingAverageCostFromPrice(result.holdings);
+    const holdings = normalizeCashHoldings(
+      fillMissingAverageCostFromPrice(result.holdings),
+    );
     const filledFromPrice = holdings.filter(
       (h, i) =>
         result.holdings[i]?.averageCost == null &&
         h.averageCost != null &&
-        h.currentPrice != null,
+        h.currentPrice != null &&
+        h.ticker !== "CASH",
     ).length;
 
     const warnings = [...result.warnings];

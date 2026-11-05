@@ -9,6 +9,7 @@
 import Papa from "papaparse";
 import type { ParsedHolding, ParseResult } from "./parsed-holding";
 import { parseNum, normalizeTicker, deduplicateHoldings } from "./normalize-holdings";
+import { looksLikeCashLabel, normalizeCashHoldings, toCashHolding } from "./cash";
 
 // ---------------------------------------------------------------------------
 // Column alias map
@@ -187,28 +188,46 @@ export function parseCsvText(csvText: string, filename = ""): ParseResult {
       continue;
     }
 
-    // Skip subtotal / summary rows that brokers sometimes include
-    if (/^(total|subtotal|cash|account total|--)/i.test(ticker)) {
+    // Skip subtotal / summary rows that brokers sometimes include.
+    // Cash is kept as a real holding (normalized to ticker CASH).
+    if (/^(total|subtotal|account total|--)$/i.test(ticker)) {
       parseWarnings.push(`Row ${rowNum}: skipped — looks like a summary row ("${ticker}")`);
       skipped++;
       continue;
     }
 
-    const holding: ParsedHolding = {
-      ticker,
-      companyName: get("companyName") || null,
-      shares: parseNum(get("shares")),
-      averageCost: parseNum(get("averageCost")),
-      currentPrice: parseNum(get("currentPrice")),
-      marketValue: parseNum(get("marketValue")),
-      gainLoss: parseNum(get("gainLoss")),
-      currency: (get("currency") ?? "").toUpperCase() || "USD",
-    };
+    const companyName = get("companyName") || null;
+    const shares = parseNum(get("shares"));
+    const averageCost = parseNum(get("averageCost"));
+    const currentPrice = parseNum(get("currentPrice"));
+    const marketValue = parseNum(get("marketValue"));
+    const gainLoss = parseNum(get("gainLoss"));
+    const currency = (get("currency") ?? "").toUpperCase() || "USD";
 
-    holdings.push(holding);
+    if (looksLikeCashLabel(ticker, companyName)) {
+      holdings.push(
+        toCashHolding({
+          shares,
+          marketValue,
+          currency,
+        }),
+      );
+      continue;
+    }
+
+    holdings.push({
+      ticker,
+      companyName,
+      shares,
+      averageCost,
+      currentPrice,
+      marketValue,
+      gainLoss,
+      currency,
+    });
   }
 
-  const deduped = deduplicateHoldings(holdings);
+  const deduped = normalizeCashHoldings(deduplicateHoldings(holdings));
 
   const status =
     deduped.length === 0

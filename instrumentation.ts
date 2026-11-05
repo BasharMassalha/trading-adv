@@ -11,6 +11,10 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.VERCEL) return;
 
+  // Pin Neon to IPv4 before background loops hit Prisma (Windows IPv6 timeouts).
+  const { initPrisma } = await import("@/lib/prisma");
+  await initPrisma();
+
   const { startQuoteRefresh } = await import("@/lib/market-data/quote-loop");
   startQuoteRefresh();
 

@@ -15,6 +15,7 @@ import {
   CostBasisError,
   unrealizedGainLoss,
 } from "@/lib/portfolio/cost-basis";
+import { CASH_TICKER, isCashSymbol } from "@/lib/portfolio/cash";
 
 export type EditableHolding = {
   symbol: string;
@@ -97,13 +98,14 @@ function previewLots(
 }
 
 function emptyTrade(ticker: string, price: number | null): DraftTx {
+  const cash = isCashSymbol(ticker);
   return {
     id: crypto.randomUUID(),
     ticker,
     side: "BUY",
     shares: "",
-    price: price != null ? String(price) : "",
-    priceSource: price != null ? "market" : "custom",
+    price: cash ? "1" : price != null ? String(price) : "",
+    priceSource: cash || price != null ? "market" : "custom",
   };
 }
 
@@ -149,6 +151,7 @@ function TradeFields({
   averageCost: number | null;
   marketPrice: number | null;
 }) {
+  const cash = isCashSymbol(draft.ticker);
   const usingAvg =
     draft.priceSource === "avg" ||
     (draft.priceSource !== "market" && samePrice(draft.price, averageCost));
@@ -162,6 +165,72 @@ function TradeFields({
     else if (marketPrice != null && samePrice(price, marketPrice)) priceSource = "market";
     else if (draft.priceSource === "avg" && averageCost == null) priceSource = "avg";
     onChange({ price, priceSource });
+  }
+
+  if (cash) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto]">
+        <div className="space-y-1.5">
+          <Label className="text-[11px]">Side</Label>
+          <div className="flex h-9 overflow-hidden rounded-md border">
+            <button
+              type="button"
+              className={cn(
+                "px-3 text-[12.5px] font-medium",
+                draft.side === "BUY"
+                  ? "bg-success-soft text-success"
+                  : "bg-surface text-muted-foreground",
+              )}
+              onClick={() => onChange({ side: "BUY", price: "1", priceSource: "market" })}
+            >
+              Deposit
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "border-l px-3 text-[12.5px] font-medium",
+                draft.side === "SELL"
+                  ? "bg-destructive-soft text-destructive"
+                  : "bg-surface text-muted-foreground",
+              )}
+              onClick={() => onChange({ side: "SELL", price: "1", priceSource: "market" })}
+            >
+              Withdraw
+            </button>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`shares-${draft.id}`} className="text-[11px]">
+            Amount ($)
+          </Label>
+          <Input
+            id={`shares-${draft.id}`}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={draft.shares}
+            onChange={(e) =>
+              onChange({ shares: e.target.value, price: "1", priceSource: "market" })
+            }
+            placeholder="1000"
+            autoFocus
+          />
+        </div>
+        <div className="flex items-end">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label="Remove cash adjustment"
+            disabled={!canRemove}
+            onClick={onRemove}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -363,9 +432,19 @@ export function EditHoldingsClient({
     setNewTicker("");
   }
 
+  function startCash() {
+    setShowNewTicker(false);
+    setNewTicker("");
+    openTrade(CASH_TICKER, 1);
+  }
+
   function confirmNewTicker() {
     const symbol = newTicker.trim().toUpperCase();
     if (!symbol) return;
+    if (isCashSymbol(symbol)) {
+      startCash();
+      return;
+    }
     if (heldSymbols.has(symbol)) {
       openTrade(
         symbol,
@@ -402,14 +481,22 @@ export function EditHoldingsClient({
         return;
       }
       if (!(shares > 0) || !Number.isFinite(shares)) {
-        setError(`Enter a valid share quantity for ${ticker}.`);
+        setError(
+          isCashSymbol(ticker)
+            ? "Enter a valid cash amount."
+            : `Enter a valid share quantity for ${ticker}.`,
+        );
         return;
       }
-      if (d.price.trim() === "" || !(price >= 0) || !Number.isFinite(price)) {
+      const fillPrice = isCashSymbol(ticker) ? 1 : price;
+      if (
+        !isCashSymbol(ticker) &&
+        (d.price.trim() === "" || !(fillPrice >= 0) || !Number.isFinite(fillPrice))
+      ) {
         setError(`Enter a valid price for ${ticker}.`);
         return;
       }
-      transactions.push({ ticker, side: d.side, shares, price });
+      transactions.push({ ticker, side: d.side, shares, price: fillPrice });
     }
 
     setSaving(true);
@@ -450,36 +537,38 @@ export function EditHoldingsClient({
           </Link>
         }
         title="Record trades"
-        description={`Buy or sell shares in ${portfolioName}. Open a ticker to enter the trade — average cost and gain/loss update in place.`}
+        description={`Buy or sell shares in ${portfolioName}, or add cash. Open a row to enter the trade — average cost and gain/loss update in place.`}
       />
 
       <div className="border bg-surface">
         <div className="border-b px-4 py-3">
           <h2 className="text-[13.5px] font-semibold">Positions</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Click Trade on a row to buy or sell that ticker right here.
+            Click Trade on a row to buy or sell that ticker, or add cash below.
           </p>
         </div>
 
         <div className="divide-y">
           {holdings.length === 0 && orphanSymbols.length === 0 ? (
             <p className="px-4 py-6 text-[13px] text-muted-foreground">
-              No holdings yet. Add a new ticker to open a position.
+              No holdings yet. Add a ticker or cash to open a position.
             </p>
           ) : null}
 
           {holdings.map((h) => {
             const symbol = h.symbol.toUpperCase();
+            const cash = isCashSymbol(symbol);
             const isOpen = expanded.has(symbol);
             const tickerDrafts = draftsFor(symbol);
             const next = preview.get(symbol);
             const removed = isOpen && tickerDrafts.length > 0 && !next;
             const qty = removed ? 0 : (next?.quantity ?? h.quantity);
             const avg = removed ? null : (next?.averageCost ?? h.averageCost);
+            const price = cash ? 1 : h.currentPrice;
             const { marketValue, unrealized } = unrealizedGainLoss(
               qty,
               avg,
-              h.currentPrice,
+              price,
             );
             const unrealizedPct =
               unrealized != null && avg != null && qty > 0 && avg * qty !== 0
@@ -500,6 +589,7 @@ export function EditHoldingsClient({
                           {h.name}
                         </span>
                       ) : null}
+                      {cash ? <Badge variant="secondary">Cash</Badge> : null}
                       {removed ? (
                         <Badge variant="destructive">Will close</Badge>
                       ) : changed && isOpen ? (
@@ -516,24 +606,29 @@ export function EditHoldingsClient({
                   <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-right font-mono text-[12px] sm:grid-cols-4">
                     <div>
                       <div className="text-[10.5px] uppercase tracking-wide text-faint">
-                        Shares
+                        {cash ? "Amount" : "Shares"}
                       </div>
                       <div>
-                        {h.quantity}
+                        {cash ? formatCurrency(h.quantity) : h.quantity}
                         {qty !== h.quantity ? (
-                          <span className="text-primary"> → {qty}</span>
+                          <span className="text-primary">
+                            {" "}
+                            → {cash ? formatCurrency(qty) : qty}
+                          </span>
                         ) : null}
                       </div>
                     </div>
                     <div>
                       <div className="text-[10.5px] uppercase tracking-wide text-faint">
-                        Avg cost
+                        {cash ? "Unit" : "Avg cost"}
                       </div>
                       <div>
-                        {h.averageCost != null
-                          ? formatCurrency(h.averageCost)
-                          : "—"}
-                        {avg != null && avg !== h.averageCost ? (
+                        {cash
+                          ? formatCurrency(1)
+                          : h.averageCost != null
+                            ? formatCurrency(h.averageCost)
+                            : "—"}
+                        {!cash && avg != null && avg !== h.averageCost ? (
                           <span className="text-primary">
                             {" "}
                             → {formatCurrency(avg)}
@@ -564,8 +659,12 @@ export function EditHoldingsClient({
                               : "",
                         )}
                       >
-                        {unrealized != null ? formatCurrency(unrealized) : "—"}
-                        {unrealizedPct != null
+                        {cash
+                          ? "—"
+                          : unrealized != null
+                            ? formatCurrency(unrealized)
+                            : "—"}
+                        {!cash && unrealizedPct != null
                           ? ` (${formatPercent(unrealizedPct)})`
                           : ""}
                       </div>
@@ -588,9 +687,9 @@ export function EditHoldingsClient({
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => openTrade(symbol, h.currentPrice)}
+                        onClick={() => openTrade(symbol, cash ? 1 : h.currentPrice)}
                       >
-                        Trade
+                        {cash ? "Adjust" : "Trade"}
                         <ChevronDown className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -600,9 +699,22 @@ export function EditHoldingsClient({
                 {isOpen ? (
                   <div className="mt-3 space-y-3 border border-border-strong bg-background p-3.5">
                     <p className="text-[12px] text-muted-foreground">
-                      Enter buy or sell for <span className="font-mono font-semibold text-foreground">{symbol}</span>
-                      , shares, and fill price. Use <span className="text-foreground">Avg cost</span> to
-                      trade at your average. Preview updates above.
+                      {cash ? (
+                        <>
+                          Deposit or withdraw cash. Amount is in dollars and
+                          counts toward portfolio value at $1 per unit.
+                        </>
+                      ) : (
+                        <>
+                          Enter buy or sell for{" "}
+                          <span className="font-mono font-semibold text-foreground">
+                            {symbol}
+                          </span>
+                          , shares, and fill price. Use{" "}
+                          <span className="text-foreground">Avg cost</span> to
+                          trade at your average. Preview updates above.
+                        </>
+                      )}
                     </p>
                     {tickerDrafts.map((d) => (
                       <TradeFields
@@ -615,17 +727,17 @@ export function EditHoldingsClient({
                         }}
                         canRemove
                         averageCost={averageCostBeforeDraft(h, drafts, d.id)}
-                        marketPrice={h.currentPrice}
+                        marketPrice={cash ? 1 : h.currentPrice}
                       />
                     ))}
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => addTradeTo(symbol, h.currentPrice)}
+                      onClick={() => addTradeTo(symbol, cash ? 1 : h.currentPrice)}
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      Another trade for {symbol}
+                      {cash ? "Another cash adjustment" : `Another trade for ${symbol}`}
                     </Button>
                   </div>
                 ) : null}
@@ -633,8 +745,9 @@ export function EditHoldingsClient({
             );
           })}
 
-          {/* New tickers opened via Add ticker */}
+          {/* New tickers opened via Add ticker / Add cash */}
           {orphanSymbols.map((symbol) => {
+            const cash = isCashSymbol(symbol);
             const tickerDrafts = draftsFor(symbol);
             const next = preview.get(symbol);
             const isOpen = expanded.has(symbol) || tickerDrafts.length > 0;
@@ -646,13 +759,19 @@ export function EditHoldingsClient({
                     <span className="font-mono text-[13px] font-semibold">
                       {symbol}
                     </span>
-                    <Badge variant="secondary">New position</Badge>
+                    <Badge variant="secondary">
+                      {cash ? "New cash" : "New position"}
+                    </Badge>
                     {next ? (
                       <span className="font-mono text-[12px] text-muted-foreground">
-                        → {next.quantity} sh @{" "}
-                        {next.averageCost != null
-                          ? formatCurrency(next.averageCost)
-                          : "—"}
+                        →{" "}
+                        {cash
+                          ? formatCurrency(next.quantity)
+                          : `${next.quantity} sh @ ${
+                              next.averageCost != null
+                                ? formatCurrency(next.averageCost)
+                                : "—"
+                            }`}
                       </span>
                     ) : null}
                   </div>
@@ -669,11 +788,23 @@ export function EditHoldingsClient({
                 {isOpen ? (
                   <div className="mt-3 space-y-3 border border-border-strong bg-background p-3.5">
                     <p className="text-[12px] text-muted-foreground">
-                      Enter buy or sell for{" "}
-                      <span className="font-mono font-semibold text-foreground">{symbol}</span>
-                      , shares, and fill price. Use{" "}
-                      <span className="text-foreground">Avg cost</span> to record the
-                      trade at your average. Preview updates above.
+                      {cash ? (
+                        <>
+                          Deposit cash into this portfolio. Amount is in dollars
+                          and counts toward total value at $1 per unit.
+                        </>
+                      ) : (
+                        <>
+                          Enter buy or sell for{" "}
+                          <span className="font-mono font-semibold text-foreground">
+                            {symbol}
+                          </span>
+                          , shares, and fill price. Use{" "}
+                          <span className="text-foreground">Avg cost</span> to
+                          record the trade at your average. Preview updates
+                          above.
+                        </>
+                      )}
                     </p>
                     {tickerDrafts.map((d) => (
                       <TradeFields
@@ -686,17 +817,19 @@ export function EditHoldingsClient({
                         }}
                         canRemove
                         averageCost={averageCostBeforeDraft(null, drafts, d.id)}
-                        marketPrice={null}
+                        marketPrice={cash ? 1 : null}
                       />
                     ))}
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => addTradeTo(symbol, null)}
+                      onClick={() => addTradeTo(symbol, cash ? 1 : null)}
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      Another trade for {symbol}
+                      {cash
+                        ? "Another cash adjustment"
+                        : `Another trade for ${symbol}`}
                     </Button>
                   </div>
                 ) : null}
@@ -740,10 +873,29 @@ export function EditHoldingsClient({
               </Button>
             </div>
           ) : (
-            <Button type="button" size="sm" variant="outline" onClick={startNewTicker}>
-              <Plus className="h-3.5 w-3.5" />
-              Add ticker
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={startNewTicker}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add ticker
+              </Button>
+              {!heldSymbols.has(CASH_TICKER) &&
+              !orphanSymbols.includes(CASH_TICKER) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={startCash}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add cash
+                </Button>
+              ) : null}
+            </div>
           )}
         </div>
       </div>

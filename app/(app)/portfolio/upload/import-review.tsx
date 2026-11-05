@@ -18,6 +18,12 @@ import {
   Pencil,
 } from "lucide-react";
 import { parsedHoldingSchema, type ParseResult } from "@/lib/portfolio/parsed-holding";
+import {
+  CASH_TICKER,
+  isCashSymbol,
+  normalizeCashHoldings,
+  toCashHolding,
+} from "@/lib/portfolio/cash";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,21 +123,26 @@ export function ImportReview({
     register,
     control,
     handleSubmit,
+    setValue,
+    getValues,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<ReviewFormValues>({
     resolver: zodResolver(reviewFormSchema),
     defaultValues: {
       portfolioName: defaultName,
-      holdings: result.holdings.map((h) => ({
-        ticker: h.ticker ?? "",
-        companyName: h.companyName ?? null,
-        shares: h.shares ?? null,
-        averageCost: h.averageCost ?? null,
-        currentPrice: h.currentPrice ?? null,
-        marketValue: h.marketValue ?? null,
-        gainLoss: h.gainLoss ?? null,
-        currency: h.currency ?? "USD",
-      })),
+      holdings: normalizeCashHoldings(
+        result.holdings.map((h) => ({
+          ticker: h.ticker ?? "",
+          companyName: h.companyName ?? null,
+          shares: h.shares ?? null,
+          averageCost: h.averageCost ?? null,
+          currentPrice: h.currentPrice ?? null,
+          marketValue: h.marketValue ?? null,
+          gainLoss: h.gainLoss ?? null,
+          currency: h.currency ?? "USD",
+        })),
+      ),
     },
   });
 
@@ -140,7 +151,43 @@ export function ImportReview({
     name: "holdings",
   });
 
+  const watchedHoldings = watch("holdings");
+  const hasCashRow = (watchedHoldings ?? []).some((h) =>
+    isCashSymbol(h?.ticker),
+  );
+
+  function addCashRow() {
+    const current = getValues("holdings") ?? [];
+    const existingIdx = current.findIndex((h) => isCashSymbol(h.ticker));
+    if (existingIdx >= 0) {
+      const row = document.getElementById(`holding-ticker-${existingIdx}`);
+      row?.focus();
+      return;
+    }
+    append(
+      toCashHolding({
+        amount: null,
+        currency: "USD",
+      }),
+    );
+  }
+
+  function onCashAmountChange(index: number, raw: string) {
+    const amount = raw === "" ? null : Number(raw);
+    const value =
+      amount != null && Number.isFinite(amount) && amount >= 0 ? amount : null;
+    setValue(`holdings.${index}.shares`, value, { shouldValidate: true });
+    setValue(`holdings.${index}.marketValue`, value, { shouldValidate: true });
+    setValue(`holdings.${index}.averageCost`, 1, { shouldValidate: true });
+    setValue(`holdings.${index}.currentPrice`, 1, { shouldValidate: true });
+    setValue(`holdings.${index}.gainLoss`, 0, { shouldValidate: true });
+    setValue(`holdings.${index}.companyName`, "Cash", { shouldValidate: true });
+    setValue(`holdings.${index}.ticker`, CASH_TICKER, { shouldValidate: true });
+  }
+
   async function onSubmit(values: ReviewFormValues) {
+    const holdings = normalizeCashHoldings(values.holdings);
+
     const res = await fetch("/api/portfolio/confirm-import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -149,7 +196,7 @@ export function ImportReview({
         portfolioName: values.portfolioName,
         source: result.sourceType,
         baseCurrency: "USD",
-        holdings: values.holdings,
+        holdings,
       }),
     });
 
@@ -268,7 +315,8 @@ export function ImportReview({
             <div>
               <CardTitle className="text-[14px]">Holdings</CardTitle>
               <CardDescription className="mt-0.5 text-[12px]">
-                Click any cell to edit. All fields except ticker are optional.
+                Click any cell to edit. Add cash if the screenshot missed your
+                cash balance. All fields except ticker are optional.
               </CardDescription>
             </div>
             {!isEditing && (
@@ -286,7 +334,7 @@ export function ImportReview({
                 {[
                   { label: "Ticker", className: "pl-4 text-left w-[88px]" },
                   { label: "Company", className: "text-left min-w-[160px]" },
-                  { label: "Shares", className: "text-right w-[90px]" },
+                  { label: "Shares / $", className: "text-right w-[90px]" },
                   { label: "Avg cost", className: "text-right w-[90px]" },
                   { label: "Price", className: "text-right w-[90px]" },
                   { label: "Mkt value", className: "text-right w-[100px]" },
@@ -309,6 +357,7 @@ export function ImportReview({
             <tbody>
               {fields.map((field, i) => {
                 const rowErr = errors.holdings?.[i];
+                const cash = isCashSymbol(watchedHoldings?.[i]?.ticker);
                 return (
                   <tr
                     key={field.id}
@@ -319,16 +368,29 @@ export function ImportReview({
                       error={rowErr?.ticker?.message}
                       className="pl-4"
                     >
-                      <input
-                        {...register(`holdings.${i}.ticker`)}
-                        placeholder="AAPL"
-                        className={cn(
-                          textInputClass,
-                          "font-mono font-semibold uppercase",
-                          rowErr?.ticker &&
-                            "bg-destructive-soft ring-destructive/60 hover:bg-destructive-soft focus:bg-destructive-soft",
-                        )}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          id={`holding-ticker-${i}`}
+                          {...register(`holdings.${i}.ticker`)}
+                          placeholder="AAPL"
+                          readOnly={cash}
+                          className={cn(
+                            textInputClass,
+                            "font-mono font-semibold uppercase",
+                            cash && "text-muted-foreground",
+                            rowErr?.ticker &&
+                              "bg-destructive-soft ring-destructive/60 hover:bg-destructive-soft focus:bg-destructive-soft",
+                          )}
+                        />
+                        {cash ? (
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 px-1 text-[10px] leading-4"
+                          >
+                            cash
+                          </Badge>
+                        ) : null}
+                      </div>
                     </Cell>
 
                     {/* Company Name */}
@@ -336,19 +398,32 @@ export function ImportReview({
                       <input
                         {...register(`holdings.${i}.companyName`)}
                         placeholder="—"
-                        className={textInputClass}
+                        readOnly={cash}
+                        className={cn(textInputClass, cash && "text-muted-foreground")}
                       />
                     </Cell>
 
-                    {/* Shares */}
+                    {/* Shares / cash amount */}
                     <Cell error={rowErr?.shares?.message}>
                       <input
-                        {...register(`holdings.${i}.shares`)}
                         type="number"
                         step="any"
                         min={0}
-                        placeholder="—"
+                        placeholder={cash ? "1000" : "—"}
+                        value={watchedHoldings?.[i]?.shares ?? ""}
+                        onChange={(e) => {
+                          if (cash) {
+                            onCashAmountChange(i, e.target.value);
+                            return;
+                          }
+                          setValue(
+                            `holdings.${i}.shares`,
+                            e.target.value === "" ? null : Number(e.target.value),
+                            { shouldValidate: true },
+                          );
+                        }}
                         className={numInputClass}
+                        aria-label={cash ? "Cash amount" : "Shares"}
                       />
                     </Cell>
 
@@ -360,7 +435,8 @@ export function ImportReview({
                         step="any"
                         min={0}
                         placeholder="—"
-                        className={numInputClass}
+                        readOnly={cash}
+                        className={cn(numInputClass, cash && "text-muted-foreground")}
                       />
                     </Cell>
 
@@ -372,7 +448,8 @@ export function ImportReview({
                         step="any"
                         min={0}
                         placeholder="—"
-                        className={numInputClass}
+                        readOnly={cash}
+                        className={cn(numInputClass, cash && "text-muted-foreground")}
                       />
                     </Cell>
 
@@ -383,7 +460,8 @@ export function ImportReview({
                         type="number"
                         step="any"
                         placeholder="—"
-                        className={numInputClass}
+                        readOnly={cash}
+                        className={cn(numInputClass, cash && "text-muted-foreground")}
                       />
                     </Cell>
 
@@ -398,6 +476,7 @@ export function ImportReview({
                             step="any"
                             placeholder="—"
                             value={f.value ?? ""}
+                            readOnly={cash}
                             onChange={(e) =>
                               f.onChange(
                                 e.target.value === "" ? null : e.target.value,
@@ -405,6 +484,7 @@ export function ImportReview({
                             }
                             className={cn(
                               numInputClass,
+                              cash && "text-muted-foreground",
                               typeof f.value === "number" && f.value < 0
                                 ? "text-destructive"
                                 : typeof f.value === "number" && f.value > 0
@@ -449,13 +529,13 @@ export function ImportReview({
           {fields.length === 0 && (
             <div className="mx-4 mt-4 border border-dashed bg-background p-8 text-center text-[12.5px] text-muted-foreground">
               {isEditing
-                ? "No holdings. Add rows manually to rebuild this portfolio."
-                : "No holdings. Add rows manually, or go back and re-upload."}
+                ? "No holdings. Add rows or cash manually to rebuild this portfolio."
+                : "No holdings. Add rows or cash manually, or go back and re-upload."}
             </div>
           )}
 
-          {/* Add row */}
-          <div className="mt-3 px-4">
+          {/* Add row / cash */}
+          <div className="mt-3 flex flex-wrap gap-2 px-4">
             <Button
               type="button"
               variant="outline"
@@ -476,6 +556,15 @@ export function ImportReview({
               <Plus className="h-3.5 w-3.5" />
               Add row
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addCashRow}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {hasCashRow ? "Edit cash" : "Add cash"}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -493,8 +582,9 @@ export function ImportReview({
           <Sparkles className="mt-px h-3.5 w-3.5 shrink-0 text-primary" />
           <p className="leading-relaxed text-muted-foreground">
             Holdings were extracted automatically. Please verify every value
-            carefully. AI extraction is not perfect and does not replace your
-            broker records.
+            carefully, and use <span className="text-foreground">Add cash</span>{" "}
+            if a cash balance was missed. AI extraction is not perfect and does
+            not replace your broker records.
           </p>
         </div>
       )}

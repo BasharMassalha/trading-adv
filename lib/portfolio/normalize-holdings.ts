@@ -5,6 +5,7 @@
  */
 
 import type { ParsedHolding } from "./parsed-holding";
+import { isCashSymbol, normalizeCashHolding } from "./cash";
 
 // ---------------------------------------------------------------------------
 // String → Number helpers
@@ -58,6 +59,8 @@ export function fillMissingAverageCostFromPrice(
   holdings: ParsedHolding[],
 ): ParsedHolding[] {
   return holdings.map((h) => {
+    const cashNormalized = normalizeCashHolding(h);
+    if (isCashSymbol(cashNormalized.ticker)) return cashNormalized;
     if (h.averageCost != null || h.currentPrice == null) return h;
     return { ...h, averageCost: h.currentPrice };
   });
