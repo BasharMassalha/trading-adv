@@ -33,6 +33,8 @@ type DraftTx = {
   side: "BUY" | "SELL";
   shares: string;
   price: string;
+  /** Which fill the price field is using. "avg" stays selected while typing a new position's cost. */
+  priceSource: "market" | "avg" | "custom";
 };
 
 type Props = {
@@ -60,6 +62,7 @@ function previewLots(
   for (const d of drafts) {
     const ticker = d.ticker.trim().toUpperCase();
     if (!ticker) continue;
+    if (d.shares.trim() === "" || d.price.trim() === "") continue;
     const shares = Number(d.shares);
     const price = Number(d.price);
     if (
@@ -100,7 +103,35 @@ function emptyTrade(ticker: string, price: number | null): DraftTx {
     side: "BUY",
     shares: "",
     price: price != null ? String(price) : "",
+    priceSource: price != null ? "market" : "custom",
   };
+}
+
+function samePrice(value: string, target: number | null): boolean {
+  if (target == null || value.trim() === "") return false;
+  const n = Number(value);
+  return Number.isFinite(n) && Math.abs(n - target) < 1e-6;
+}
+
+/** Average cost of the position before this draft is applied. */
+function averageCostBeforeDraft(
+  holding: EditableHolding | null,
+  drafts: DraftTx[],
+  draftId: string,
+): number | null {
+  const current = drafts.find((d) => d.id === draftId);
+  const ticker = (holding?.symbol ?? current?.ticker ?? "").trim().toUpperCase();
+  if (!ticker) return holding?.averageCost ?? null;
+
+  const prior: DraftTx[] = [];
+  for (const d of drafts) {
+    if (d.id === draftId) break;
+    if (d.ticker.toUpperCase() === ticker) prior.push(d);
+  }
+  if (prior.length === 0) return holding?.averageCost ?? null;
+
+  const lot = previewLots(holding ? [holding] : [], prior).get(ticker);
+  return lot?.averageCost ?? null;
 }
 
 function TradeFields({
@@ -108,12 +139,31 @@ function TradeFields({
   onChange,
   onRemove,
   canRemove,
+  averageCost,
+  marketPrice,
 }: {
   draft: DraftTx;
   onChange: (patch: Partial<DraftTx>) => void;
   onRemove: () => void;
   canRemove: boolean;
+  averageCost: number | null;
+  marketPrice: number | null;
 }) {
+  const usingAvg =
+    draft.priceSource === "avg" ||
+    (draft.priceSource !== "market" && samePrice(draft.price, averageCost));
+  const usingMkt =
+    !usingAvg &&
+    (draft.priceSource === "market" || samePrice(draft.price, marketPrice));
+
+  function onPriceChange(price: string) {
+    let priceSource: DraftTx["priceSource"] = "custom";
+    if (averageCost != null && samePrice(price, averageCost)) priceSource = "avg";
+    else if (marketPrice != null && samePrice(price, marketPrice)) priceSource = "market";
+    else if (draft.priceSource === "avg" && averageCost == null) priceSource = "avg";
+    onChange({ price, priceSource });
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr_auto]">
       <div className="space-y-1.5">
@@ -165,16 +215,68 @@ function TradeFields({
         <Label htmlFor={`price-${draft.id}`} className="text-[11px]">
           Price
         </Label>
-        <Input
-          id={`price-${draft.id}`}
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="any"
-          value={draft.price}
-          onChange={(e) => onChange({ price: e.target.value })}
-          placeholder="150.00"
-        />
+        <div
+          className={cn(
+            "flex h-9 overflow-hidden rounded-md border border-input bg-surface",
+            "focus-within:border-primary focus-within:ring-1 focus-within:ring-ring",
+          )}
+        >
+          <input
+            id={`price-${draft.id}`}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={draft.price}
+            onChange={(e) => onPriceChange(e.target.value)}
+            placeholder={usingAvg && averageCost == null ? "Avg cost" : "150.00"}
+            className="h-9 min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none placeholder:text-faint"
+          />
+          <div className="flex shrink-0 border-l">
+            {marketPrice != null ? (
+              <button
+                type="button"
+                className={cn(
+                  "px-2.5 text-[12px] font-medium transition-colors",
+                  usingMkt
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-background hover:text-foreground",
+                )}
+                onClick={() =>
+                  onChange({ price: String(marketPrice), priceSource: "market" })
+                }
+                title={`Fill at market price ${formatCurrency(marketPrice)}`}
+              >
+                Market
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={cn(
+                "px-2.5 text-[12px] font-medium transition-colors",
+                marketPrice != null && "border-l",
+                usingAvg
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-background hover:text-foreground",
+              )}
+              onClick={() => {
+                if (averageCost != null) {
+                  onChange({ price: String(averageCost), priceSource: "avg" });
+                  return;
+                }
+                onChange({ priceSource: "avg" });
+                document.getElementById(`price-${draft.id}`)?.focus();
+              }}
+              title={
+                averageCost != null
+                  ? `Fill at average cost ${formatCurrency(averageCost)}`
+                  : "Enter this trade at your average cost"
+              }
+            >
+              Avg cost
+            </button>
+          </div>
+        </div>
       </div>
       <div className="flex items-end">
         <Button
@@ -303,7 +405,7 @@ export function EditHoldingsClient({
         setError(`Enter a valid share quantity for ${ticker}.`);
         return;
       }
-      if (!(price >= 0) || !Number.isFinite(price)) {
+      if (d.price.trim() === "" || !(price >= 0) || !Number.isFinite(price)) {
         setError(`Enter a valid price for ${ticker}.`);
         return;
       }
@@ -499,7 +601,8 @@ export function EditHoldingsClient({
                   <div className="mt-3 space-y-3 border border-border-strong bg-background p-3.5">
                     <p className="text-[12px] text-muted-foreground">
                       Enter buy or sell for <span className="font-mono font-semibold text-foreground">{symbol}</span>
-                      , shares, and fill price. Preview updates above.
+                      , shares, and fill price. Use <span className="text-foreground">Avg cost</span> to
+                      trade at your average. Preview updates above.
                     </p>
                     {tickerDrafts.map((d) => (
                       <TradeFields
@@ -511,6 +614,8 @@ export function EditHoldingsClient({
                           if (tickerDrafts.length <= 1) closeTrade(symbol);
                         }}
                         canRemove
+                        averageCost={averageCostBeforeDraft(h, drafts, d.id)}
+                        marketPrice={h.currentPrice}
                       />
                     ))}
                     <Button
@@ -563,6 +668,13 @@ export function EditHoldingsClient({
                 </div>
                 {isOpen ? (
                   <div className="mt-3 space-y-3 border border-border-strong bg-background p-3.5">
+                    <p className="text-[12px] text-muted-foreground">
+                      Enter buy or sell for{" "}
+                      <span className="font-mono font-semibold text-foreground">{symbol}</span>
+                      , shares, and fill price. Use{" "}
+                      <span className="text-foreground">Avg cost</span> to record the
+                      trade at your average. Preview updates above.
+                    </p>
                     {tickerDrafts.map((d) => (
                       <TradeFields
                         key={d.id}
@@ -573,6 +685,8 @@ export function EditHoldingsClient({
                           if (tickerDrafts.length <= 1) closeTrade(symbol);
                         }}
                         canRemove
+                        averageCost={averageCostBeforeDraft(null, drafts, d.id)}
+                        marketPrice={null}
                       />
                     ))}
                     <Button
