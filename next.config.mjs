@@ -5,9 +5,13 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     instrumentationHook: true,
-    // yahoo-finance2 pulls @deno/shim-deno (Node `net`). Keep it external so
-    // webpack does not try to bundle it into instrumentation / server graphs.
-    serverComponentsExternalPackages: ["yahoo-finance2"],
+    // Keep Node-only drivers out of the instrumentation / server webpack graph.
+    serverComponentsExternalPackages: [
+      "yahoo-finance2",
+      "@neondatabase/serverless",
+      "@prisma/adapter-neon",
+      "ws",
+    ],
     serverActions: {
       bodySizeLimit: "10mb",
     },
@@ -15,6 +19,8 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Instrumentation is not covered by serverComponentsExternalPackages alone.
+      // Scoped npm packages must not be listed as bare webpack externals (@ breaks
+      // the concat parser). Rely on serverComponentsExternalPackages for those.
       const prev = config.externals;
       config.externals = [
         ...(Array.isArray(prev) ? prev : prev ? [prev] : []),

@@ -2,7 +2,8 @@
 // Run `npm run prisma:migrate` to apply schema changes to your database.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
