@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { truncateWhy } from "@/lib/trading-agent/why";
 import type {
   MindDecision,
   MindPhase,
@@ -167,7 +168,7 @@ export function AgentMind({
                       ) : null}
                     </div>
                     <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
-                      {decision.reason}
+                      {truncateWhy(decision.reason)}
                     </p>
                   </li>
                 ))}

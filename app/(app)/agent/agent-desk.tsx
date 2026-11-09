@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/layout/page-header";
 import { formatCurrency, formatPercent } from "@/lib/utils";
+import { truncateWhy } from "@/lib/trading-agent/why";
 import type { AgentOverview, AgentRunView, TradingAgentView } from "@/lib/trading-agent/types";
 import { AgentMind } from "./agent-mind";
 
@@ -321,45 +322,65 @@ function AgentCard({
             </p>
           ) : null}
           {latest.orders.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[12.5px]">
-                <thead className="text-[11px] uppercase tracking-wide text-faint">
-                  <tr>
-                    <th className="py-2 pr-3 font-medium">Side</th>
-                    <th className="py-2 pr-3 font-medium">Ticker</th>
-                    <th className="py-2 pr-3 font-medium">Shares</th>
-                    <th className="py-2 pr-3 font-medium">Price</th>
-                    <th className="py-2 pr-3 font-medium">Notional</th>
-                    <th className="py-2 font-medium">Why</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {latest.orders.map((order) => (
-                    <tr key={order.id} className="border-t align-top">
-                      <td className="py-2 pr-3 font-medium">{order.side}</td>
-                      <td className="py-2 pr-3 font-mono">{order.ticker}</td>
-                      <td className="py-2 pr-3 tabular-nums">
-                        {formatShares(order.shares)}
-                      </td>
-                      <td className="py-2 pr-3 tabular-nums">
-                        {formatCurrency(order.price)}
-                      </td>
-                      <td className="py-2 pr-3 tabular-nums">
-                        {formatCurrency(order.notional)}
-                      </td>
-                      <td className="py-2 text-muted-foreground">{order.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="divide-y border-t">
+              {latest.orders.map((order) => (
+                <li key={order.id} className="py-3">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12.5px]">
+                    <span className="font-medium">{order.side}</span>
+                    <span className="font-mono">{order.ticker}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {formatShares(order.shares)} sh · {formatCurrency(order.price)}{" "}
+                      · {formatCurrency(order.notional)}
+                    </span>
+                  </div>
+                  {order.reason ? (
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                      {truncateWhy(order.reason)}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : latest.trace && latest.trace.decisions.length > 0 ? (
+            <ul className="divide-y border-t">
+              {latest.trace.decisions.map((decision) => (
+                <li
+                  key={`${decision.ticker}-${decision.outcome}`}
+                  className="py-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                    <span className="font-mono font-medium">{decision.ticker}</span>
+                    <span className="text-faint">
+                      {decision.outcome === "HELD"
+                        ? "Held"
+                        : decision.outcome === "SKIPPED"
+                          ? "Passed"
+                          : decision.outcome}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                    {truncateWhy(decision.reason)}
+                  </p>
+                </li>
+              ))}
+            </ul>
           ) : null}
           {agent.runs.length > 1 ? (
-            <ul className="space-y-1.5 border-t pt-3 text-[12px] text-muted-foreground">
+            <ul className="space-y-3 border-t pt-3 text-[12px] text-muted-foreground">
               {agent.runs.slice(1).map((run) => (
-                <li key={run.id} className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-faint">{formatWhen(run.startedAt)}</span>
-                  <span>{run.summary ?? run.error ?? run.status}</span>
+                <li key={run.id} className="space-y-1">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-faint">{formatWhen(run.startedAt)}</span>
+                    <span>{run.summary ?? run.error ?? run.status}</span>
+                  </div>
+                  {run.orders.map((order) => (
+                    <p key={order.id} className="leading-relaxed">
+                      <span className="font-medium text-foreground/80">
+                        {order.side} {order.ticker}
+                      </span>
+                      {order.reason ? ` — ${truncateWhy(order.reason)}` : null}
+                    </p>
+                  ))}
                 </li>
               ))}
             </ul>

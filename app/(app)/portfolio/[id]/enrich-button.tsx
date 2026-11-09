@@ -1,24 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { PortfolioViewDTO } from "@/server/services/enrichment.service";
 
 type State = "idle" | "loading" | "done" | "error";
 
 export function EnrichButton({
   portfolioId,
   lastEnrichedAt,
+  onEnriched,
 }: {
   portfolioId: string;
-  lastEnrichedAt: Date | null;
+  lastEnrichedAt: string | Date | null;
+  onEnriched?: (portfolio: PortfolioViewDTO) => void;
 }) {
-  const router = useRouter();
   const [state, setState] = useState<State>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [enrichedCount, setEnrichedCount] = useState<number | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
+  const [localUpdatedAt, setLocalUpdatedAt] = useState<string | null>(null);
 
   async function handleRefresh() {
     setState("loading");
@@ -27,7 +29,10 @@ export function EnrichButton({
     try {
       const res = await fetch(
         `/api/portfolio/${portfolioId}/enrich?force=true`,
-        { method: "POST" },
+        {
+          method: "POST",
+          cache: "no-store",
+        },
       );
       const json = await res.json();
       if (!res.ok || !json.ok) {
@@ -35,18 +40,21 @@ export function EnrichButton({
       }
       setEnrichedCount(json.data.enrichedCount);
       setProvider(json.data.provider ?? null);
+      const portfolio = json.data.portfolio as PortfolioViewDTO | undefined;
+      if (portfolio) {
+        setLocalUpdatedAt(portfolio.lastEnrichedAt);
+        onEnriched?.(portfolio);
+      }
       setState("done");
-      // Trigger server component re-fetch
-      router.refresh();
+      window.setTimeout(() => setState("idle"), 2500);
     } catch (err) {
       setState("error");
       setErrorMsg(err instanceof Error ? err.message : "Enrichment failed");
     }
   }
 
-  const ago = lastEnrichedAt
-    ? formatRelative(new Date(lastEnrichedAt))
-    : "never";
+  const stamp = localUpdatedAt ?? lastEnrichedAt;
+  const ago = stamp ? formatRelative(new Date(stamp)) : "never";
 
   return (
     <div className="flex flex-col items-end gap-1.5">

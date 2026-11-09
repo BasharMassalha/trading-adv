@@ -7,6 +7,8 @@
  * skipped so one noisy report cannot churn the book.
  */
 
+import { explainBuyTrade, explainSellTrade } from "./why";
+
 export const CASH_TICKER = "CASH";
 
 const MIN_NOTIONAL = 25;
@@ -209,16 +211,12 @@ export function planTrades(input: PolicyInput): PlannedTrade[] {
     const notional = shares * position.price;
     if (fraction < 0.999 && notional < MIN_NOTIONAL) continue;
 
-    const verb =
-      fraction >= 0.999 ? "Exited" : fraction >= 0.5 ? "Cut" : "Trimmed";
     sells.push({
       ticker: position.ticker,
       side: "SELL",
       shares,
       price: position.price,
-      reason:
-        signal.reason?.trim() ||
-        `${verb} ${position.ticker} after the analysis flagged it.`,
+      reason: explainSellTrade(signal, fraction),
     });
     sold.add(position.ticker);
   }
@@ -240,7 +238,11 @@ export function planTrades(input: PolicyInput): PlannedTrade[] {
       price: position.price,
       value: position.quantity * position.price,
       score,
-      reason: signal.reason?.trim() || `Adding to ${position.ticker}.`,
+      reason: explainBuyTrade({
+        kind: "add",
+        analysis: signal.reason,
+        conviction: signal.conviction,
+      }),
       shares: 0,
     });
   }
@@ -258,7 +260,7 @@ export function planTrades(input: PolicyInput): PlannedTrade[] {
       price,
       value: 0,
       score: 2,
-      reason: idea.rationale?.trim() || `New idea from the analysis: ${ticker}.`,
+      reason: explainBuyTrade({ kind: "open", analysis: idea.rationale }),
       shares: 0,
     });
   }

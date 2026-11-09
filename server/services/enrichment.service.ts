@@ -26,7 +26,7 @@
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 import { getMarketDataProvider, getProviderName } from "@/lib/market-data/provider";
-import { quoteCache, historyCache } from "@/lib/market-data/cache";
+import { quoteCache, historyCache, profileCache } from "@/lib/market-data/cache";
 import type { HistoricalRange } from "@/lib/market-data/types";
 import { assetRepository } from "@/server/repositories/asset.repository";
 import { priceHistoryRepository } from "@/server/repositories/price-history.repository";
@@ -138,6 +138,20 @@ export type EnrichmentResult = {
   totalValue: number;
 };
 
+/** JSON-safe portfolio snapshot for the enrich API / client UI. */
+export type PortfolioViewDTO = Omit<PortfolioView, "lastEnrichedAt"> & {
+  lastEnrichedAt: string | null;
+};
+
+export function toPortfolioViewDTO(view: PortfolioView): PortfolioViewDTO {
+  return {
+    ...view,
+    lastEnrichedAt: view.lastEnrichedAt
+      ? view.lastEnrichedAt.toISOString()
+      : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -173,6 +187,7 @@ export const enrichmentService = {
     if (forceRefresh) {
       quoteCache.clear();
       historyCache.clear();
+      profileCache.clear();
     }
 
     console.log(

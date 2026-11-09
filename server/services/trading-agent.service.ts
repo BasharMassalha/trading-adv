@@ -23,6 +23,10 @@ import {
   type HoldingSignal,
   type PlannedTrade,
 } from "@/lib/trading-agent/policy";
+import {
+  explainHoldDecision,
+  explainSkipDecision,
+} from "@/lib/trading-agent/why";
 import type {
   AgentOrderView,
   AgentOverview,
@@ -258,7 +262,7 @@ function explainDecisions(input: {
         ticker,
         stance,
         outcome: "SKIPPED",
-        reason: "The call was too weak to trade.",
+        reason: explainSkipDecision("low-conviction", signal.reason),
       });
       continue;
     }
@@ -267,7 +271,16 @@ function explainDecisions(input: {
         ticker,
         stance,
         outcome: "SKIPPED",
-        reason: "Wanted to add, but cash or the position cap got in the way.",
+        reason: explainSkipDecision("no-room"),
+      });
+      continue;
+    }
+    if (wantedSell(signal)) {
+      decisions.push({
+        ticker,
+        stance,
+        outcome: "SKIPPED",
+        reason: explainSkipDecision("wanted-sell"),
       });
       continue;
     }
@@ -275,7 +288,7 @@ function explainDecisions(input: {
       ticker,
       stance,
       outcome: "HELD",
-      reason: signal.reason?.trim() || "Left this name as it is.",
+      reason: explainHoldDecision(signal.reason),
     });
   }
 
@@ -298,9 +311,7 @@ function explainDecisions(input: {
       ticker,
       stance: "New idea",
       outcome: "SKIPPED",
-      reason: priced
-        ? "Not enough room under the position cap."
-        : "No reliable price, so it was not bought.",
+      reason: explainSkipDecision(priced ? "no-room" : "no-price"),
     });
   }
 
@@ -645,7 +656,7 @@ export const tradingAgentService = {
               action: holding.action,
               verdict: holding.verdict,
               conviction: holding.conviction,
-              reason: holding.reason,
+              reason: holding.reason || holding.thesis,
             },
           ];
         },
