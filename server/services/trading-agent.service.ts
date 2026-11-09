@@ -57,6 +57,14 @@ const agentInclude = {
 } satisfies Prisma.TradingAgentInclude;
 
 type AgentRecord = Prisma.TradingAgentGetPayload<{ include: typeof agentInclude }>;
+type AgentRow = Prisma.TradingAgentGetPayload<object>;
+
+export type StartedRun = {
+  agent: AgentRow;
+  runId: string;
+  trace: MindTrace;
+  view: TradingAgentView;
+};
 
 function num(value: Parameters<typeof toNum>[0]): number | null {
   const n = toNum(value);
@@ -532,18 +540,19 @@ export const tradingAgentService = {
   },
 
   async runForUser(userId: string, agentId: string): Promise<TradingAgentView> {
+    const started = await this.beginRunForUser(userId, agentId);
+    return this.executeRun(started);
+  },
+
+  async beginRunForUser(userId: string, agentId: string): Promise<StartedRun> {
     const agent = await prisma.tradingAgent.findFirst({
       where: { id: agentId, userId },
     });
     if (!agent) throw new NotFoundError("Agent not found.");
-    return this.run(agentId);
+    return this.beginRun(agent);
   },
 
-  async run(agentId: string): Promise<TradingAgentView> {
-    const agent = await prisma.tradingAgent.findUnique({
-      where: { id: agentId },
-    });
-    if (!agent) throw new NotFoundError("Agent not found.");
+  async beginRun(agent: AgentRow): Promise<StartedRun> {
     if (agent.status === "PAUSED") {
       throw new AppError({
         message: "This agent is paused. Resume it before running.",
@@ -554,7 +563,7 @@ export const tradingAgentService = {
 
     await prisma.agentRun.updateMany({
       where: {
-        agentId,
+        agentId: agent.id,
         status: "RUNNING",
         startedAt: { lt: new Date(Date.now() - RUN_STALE_MS) },
       },
@@ -566,7 +575,7 @@ export const tradingAgentService = {
     });
 
     const inflight = await prisma.agentRun.findFirst({
-      where: { agentId, status: "RUNNING" },
+      where: { agentId: agent.id, status: "RUNNING" },
     });
     if (inflight) {
       throw new AppError({
@@ -579,22 +588,42 @@ export const tradingAgentService = {
     const trace = freshTrace();
     const run = await prisma.agentRun.create({
       data: {
-        agentId,
+        agentId: agent.id,
         status: "RUNNING",
         trace: JSON.parse(JSON.stringify(trace)),
       },
     });
 
+    return {
+      agent,
+      runId: run.id,
+      trace,
+      view: await loadView(agent.id),
+    };
+  },
+
+  async run(agentId: string): Promise<TradingAgentView> {
+    const agent = await prisma.tradingAgent.findUnique({
+      where: { id: agentId },
+    });
+    if (!agent) throw new NotFoundError("Agent not found.");
+    return this.executeRun(await this.beginRun(agent));
+  },
+
+  async executeRun(started: StartedRun): Promise<TradingAgentView> {
+    const { agent, runId, trace } = started;
+    const agentId = agent.id;
+
     try {
       await remember(
-        run.id,
+        runId,
         trace,
         "prices",
         "Refreshing prices on the copied book.",
       );
       await enrichmentService.enrich(agent.portfolioId, { forceRefresh: true });
       await remember(
-        run.id,
+        runId,
         trace,
         "reading",
         "Prices are in. Reading news, filings, and each position.",
@@ -605,7 +634,7 @@ export const tradingAgentService = {
       });
       trace.analysisSummary = report.summary;
       await remember(
-        run.id,
+        runId,
         trace,
         "deciding",
         "Analysis is in. Keeping only the calls that clear the conviction and size bars.",
@@ -691,9 +720,9 @@ export const tradingAgentService = {
           signals.length === 0 && additions.length === 0
             ? "The analysis finished without a named buy or sell, so the book was left unchanged."
             : "Nothing cleared the conviction and size bars, so the book was left unchanged.";
-        await remember(run.id, trace, "done", summary);
+        await remember(runId, trace, "done", summary);
         await prisma.agentRun.update({
-          where: { id: run.id },
+          where: { id: runId },
           data: {
             status: "NO_TRADE",
             summary,
@@ -711,7 +740,7 @@ export const tradingAgentService = {
       }
 
       await remember(
-        run.id,
+        runId,
         trace,
         "filling",
         `Placing ${trades.filter((trade) => trade.ticker !== CASH_TICKER).length} stock fill(s) inside the copied book.`,
@@ -739,7 +768,7 @@ export const tradingAgentService = {
 
       await prisma.agentOrder.createMany({
         data: trades.map((trade) => ({
-          runId: run.id,
+          runId,
           ticker: trade.ticker,
           side: trade.side,
           shares: trade.shares,
@@ -750,9 +779,9 @@ export const tradingAgentService = {
       });
 
       const filledSummary = summarize(trades);
-      await remember(run.id, trace, "done", filledSummary);
+      await remember(runId, trace, "done", filledSummary);
       await prisma.agentRun.update({
-        where: { id: run.id },
+        where: { id: runId },
         data: {
           status: "COMPLETED",
           summary: filledSummary,
@@ -773,9 +802,9 @@ export const tradingAgentService = {
       return loadView(agentId);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Agent run failed.";
-      await remember(run.id, trace, "done", message);
+      await remember(runId, trace, "done", message);
       await prisma.agentRun.update({
-        where: { id: run.id },
+        where: { id: runId },
         data: {
           status: "FAILED",
           error: message.slice(0, 2000),

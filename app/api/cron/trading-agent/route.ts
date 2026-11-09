@@ -34,6 +34,18 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     return fail(401, "UNAUTHORIZED", "Invalid cron secret.");
   }
 
-  const tick = await tradingAgentService.tick({ limitMs: 240_000 });
+  const runTick = () => tradingAgentService.tick({ limitMs: 240_000 });
+
+  if (process.env.VERCEL === "1") {
+    const { waitUntil } = await import("@vercel/functions");
+    waitUntil(
+      runTick().catch((err) => {
+        console.error("[trading-agent] Cron tick failed:", err);
+      }),
+    );
+    return ok({ started: true, message: "Scheduled pass started." }, { status: 202 });
+  }
+
+  const tick = await runTick();
   return ok(tick);
 });

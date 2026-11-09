@@ -38,13 +38,30 @@ export function EnrichButton({
       if (!res.ok || !json.ok) {
         throw new Error(json?.error?.message ?? "Enrichment failed");
       }
-      setEnrichedCount(json.data.enrichedCount);
-      setProvider(json.data.provider ?? null);
-      const portfolio = json.data.portfolio as PortfolioViewDTO | undefined;
-      if (portfolio) {
-        setLocalUpdatedAt(portfolio.lastEnrichedAt);
-        onEnriched?.(portfolio);
+
+      let portfolio = json.data.portfolio as PortfolioViewDTO | undefined;
+      let nextProvider = (json.data.provider as string | undefined) ?? null;
+      let nextCount = (json.data.enrichedCount as number | undefined) ?? null;
+
+      if (res.status === 202 || json.data?.started) {
+        const startedAt =
+          typeof json.data?.startedAt === "string"
+            ? json.data.startedAt
+            : new Date().toISOString();
+        const polled = await pollUntilPrices(portfolioId, startedAt);
+        portfolio = polled.portfolio;
+        nextProvider = polled.provider ?? nextProvider;
+        nextCount = polled.pricedCount;
       }
+
+      if (!portfolio) {
+        throw new Error("Prices did not arrive. Try again in a moment.");
+      }
+
+      setEnrichedCount(nextCount);
+      setProvider(nextProvider);
+      setLocalUpdatedAt(portfolio.lastEnrichedAt);
+      onEnriched?.(portfolio);
       setState("done");
       window.setTimeout(() => setState("idle"), 2500);
     } catch (err) {
@@ -94,6 +111,50 @@ export function EnrichButton({
         <p className="text-[11.5px] text-destructive">{errorMsg}</p>
       )}
     </div>
+  );
+}
+
+async function pollUntilPrices(
+  portfolioId: string,
+  startedAt: string,
+): Promise<{
+  portfolio: PortfolioViewDTO;
+  provider: string | null;
+  pricedCount: number;
+}> {
+  const startedMs = new Date(startedAt).getTime();
+  const maxAttempts = 45;
+  for (let i = 0; i < maxAttempts; i += 1) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const res = await fetch(`/api/portfolio/${portfolioId}/enrich`, {
+      cache: "no-store",
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) continue;
+    const portfolio = json.data?.portfolio as PortfolioViewDTO | undefined;
+    if (!portfolio) continue;
+    const stamp = portfolio.lastEnrichedAt
+      ? new Date(portfolio.lastEnrichedAt).getTime()
+      : 0;
+    const priced =
+      typeof json.data?.pricedCount === "number"
+        ? json.data.pricedCount
+        : portfolio.holdings.filter(
+            (h) =>
+              h.symbol.toUpperCase() !== "CASH" &&
+              h.currentPrice != null &&
+              h.currentPrice > 0,
+          ).length;
+    if (stamp >= startedMs - 1000 && priced > 0) {
+      return {
+        portfolio,
+        provider: json.data?.provider ?? null,
+        pricedCount: priced,
+      };
+    }
+  }
+  throw new Error(
+    "Prices did not arrive in time. Wait a moment and retry.",
   );
 }
 

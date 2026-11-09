@@ -31,6 +31,7 @@ import type {
   LatestQuote,
 } from "./types";
 import { profileCache, quoteCache, historyCache } from "./cache";
+import { fetchHttpHistory, fetchHttpQuote } from "./http-quotes";
 
 // ---------------------------------------------------------------------------
 // Type definitions for yahoo-finance2 responses
@@ -256,52 +257,70 @@ export class YahooFinanceProvider implements IMarketDataProvider {
   async getLatestQuote(symbol: string): Promise<LatestQuote> {
     const normalized = normalizeSymbol(symbol);
     const cacheKey = `quote:${normalized}`;
+    const cached = quoteCache.get(cacheKey);
+    if (cached && cached.price > 0) return cached;
 
-    return quoteCache.getOrSet(
-      cacheKey,
-      async () => {
-        try {
-          const yf = await this.getYF();
-          const quote: YFQuote | null = await yf.quote(normalized);
+    const quote = await this.resolveQuote(normalized);
+    if (quote.price > 0) {
+      quoteCache.set(cacheKey, quote, 2 * 60 * 1000);
+    }
+    return quote;
+  }
 
-          if (!quote || quote.regularMarketPrice == null) {
-            console.warn(`[yahoo] No quote data for ${normalized}, using fallback`);
-            return buildFallbackQuote(normalized);
-          }
+  private async resolveQuote(normalized: string): Promise<LatestQuote> {
+    // On Vercel, yahoo-finance2 is often blocked or too slow. Hit HTTP first.
+    if (process.env.VERCEL === "1") {
+      const http = await fetchHttpQuote(normalized);
+      if (http && http.price > 0) return http;
+    }
 
-          const price = quote.regularMarketPrice;
-          const prevClose = quote.regularMarketPreviousClose ?? quote.previousClose;
-          const change = quote.regularMarketChange ?? (prevClose ? price - prevClose : 0);
-          const changePercent =
-            quote.regularMarketChangePercent ?? (prevClose && prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0);
+    const fromLib = await this.quoteFromYahooLib(normalized);
+    if (fromLib && fromLib.price > 0) return fromLib;
 
-          return {
-            symbol: normalized,
-            price: round4(price) ?? 0,
-            change: round4(change) ?? 0,
-            changePercent: round4(changePercent) ?? 0,
-            previousClose: round4(prevClose),
-            open: round4(quote.regularMarketOpen),
-            high: round4(quote.regularMarketDayHigh),
-            low: round4(quote.regularMarketDayLow),
-            volume: quote.regularMarketVolume,
-            timestamp: quote.regularMarketTime ?? new Date(),
-          };
-        } catch (err) {
-          if (isNotFoundError(err)) {
-            console.warn(`[yahoo] Quote not found for ${normalized}, using fallback`);
-            return buildFallbackQuote(normalized);
-          }
-          if (isRateLimitError(err)) {
-            console.error(`[yahoo] Rate limit hit for ${normalized}`);
-            throw err;
-          }
-          console.warn(`[yahoo] Quote fetch failed for ${normalized}:`, err);
-          return buildFallbackQuote(normalized);
-        }
-      },
-      2 * 60 * 1000,
-    );
+    const http = await fetchHttpQuote(normalized);
+    if (http && http.price > 0) return http;
+
+    console.warn(`[yahoo] No quote data for ${normalized}, using fallback`);
+    return buildFallbackQuote(normalized);
+  }
+
+  private async quoteFromYahooLib(normalized: string): Promise<LatestQuote | null> {
+    try {
+      const yf = await this.getYF();
+      const quote: YFQuote | null = await yf.quote(normalized);
+      if (!quote || quote.regularMarketPrice == null) return null;
+
+      const price = quote.regularMarketPrice;
+      if (!(price > 0)) return null;
+      const prevClose = quote.regularMarketPreviousClose ?? quote.previousClose;
+      const change = quote.regularMarketChange ?? (prevClose ? price - prevClose : 0);
+      const changePercent =
+        quote.regularMarketChangePercent ??
+        (prevClose && prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0);
+
+      return {
+        symbol: normalized,
+        price: round4(price) ?? 0,
+        change: round4(change) ?? 0,
+        changePercent: round4(changePercent) ?? 0,
+        previousClose: round4(prevClose),
+        open: round4(quote.regularMarketOpen),
+        high: round4(quote.regularMarketDayHigh),
+        low: round4(quote.regularMarketDayLow),
+        volume: quote.regularMarketVolume,
+        timestamp: quote.regularMarketTime ?? new Date(),
+      };
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        console.error(`[yahoo] Rate limit hit for ${normalized}`);
+        throw err;
+      }
+      console.warn(
+        `[yahoo] Library quote failed for ${normalized}:`,
+        err instanceof Error ? err.message : err,
+      );
+      return null;
+    }
   }
 
   async getHistoricalPrices(
@@ -312,6 +331,11 @@ export class YahooFinanceProvider implements IMarketDataProvider {
     const cacheKey = `history:${normalized}:${range}`;
 
     return historyCache.getOrSet(cacheKey, async () => {
+      if (process.env.VERCEL === "1") {
+        const http = await fetchHttpHistory(normalized, range);
+        if (http.length > 0) return http;
+      }
+
       try {
         const yf = await this.getYF();
         const days = rangeToDays(range);
@@ -324,34 +348,34 @@ export class YahooFinanceProvider implements IMarketDataProvider {
           interval: "1d",
         });
 
-        if (!result.quotes || result.quotes.length === 0) {
-          console.warn(`[yahoo] No historical data for ${normalized}`);
-          return [];
+        if (result.quotes && result.quotes.length > 0) {
+          return result.quotes
+            .filter((q) => q.close != null && q.date != null)
+            .map((q) => ({
+              date: q.date!.toISOString().slice(0, 10),
+              close: round4(q.close!) ?? 0,
+              open: round4(q.open),
+              high: round4(q.high),
+              low: round4(q.low),
+              volume: q.volume,
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
         }
-
-        return result.quotes
-          .filter((q) => q.close != null && q.date != null)
-          .map((q) => ({
-            date: q.date!.toISOString().slice(0, 10),
-            close: round4(q.close!) ?? 0,
-            open: round4(q.open),
-            high: round4(q.high),
-            low: round4(q.low),
-            volume: q.volume,
-          }))
-          .sort((a, b) => a.date.localeCompare(b.date));
       } catch (err) {
-        if (isNotFoundError(err)) {
-          console.warn(`[yahoo] History not found for ${normalized}`);
-          return [];
-        }
         if (isRateLimitError(err)) {
           console.error(`[yahoo] Rate limit hit for ${normalized}`);
           throw err;
         }
-        console.warn(`[yahoo] History fetch failed for ${normalized}:`, err);
-        return [];
+        console.warn(
+          `[yahoo] Library history failed for ${normalized}:`,
+          err instanceof Error ? err.message : err,
+        );
       }
+
+      const http = await fetchHttpHistory(normalized, range);
+      if (http.length > 0) return http;
+      console.warn(`[yahoo] No historical data for ${normalized}`);
+      return [];
     });
   }
 }

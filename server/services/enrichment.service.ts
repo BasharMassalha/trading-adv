@@ -27,7 +27,7 @@ import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 import { getMarketDataProvider, getProviderName } from "@/lib/market-data/provider";
 import { quoteCache, historyCache, profileCache } from "@/lib/market-data/cache";
-import type { HistoricalRange } from "@/lib/market-data/types";
+import type { AssetProfile, HistoricalRange } from "@/lib/market-data/types";
 import { assetRepository } from "@/server/repositories/asset.repository";
 import { priceHistoryRepository } from "@/server/repositories/price-history.repository";
 import { portfolioRepository } from "@/server/repositories/portfolio.repository";
@@ -49,6 +49,51 @@ function wasRecentlyEnriched(lastEnrichedAt: Date | null): boolean {
  */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next;
+      next += 1;
+      out[i] = await fn(items[i]);
+    }
+  }
+  if (items.length === 0) return [];
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
+  return out;
+}
+
+function profileFromAsset(asset: {
+  symbol: string;
+  name: string;
+  type: string;
+  exchange: string | null;
+  currency: string;
+  sector: string | null;
+  industry: string | null;
+  description: string | null;
+  marketCap: Parameters<typeof toNum>[0];
+}): AssetProfile {
+  return {
+    symbol: asset.symbol.toUpperCase(),
+    name: asset.name,
+    type: (asset.type as AssetProfile["type"]) || "STOCK",
+    exchange: asset.exchange ?? undefined,
+    currency: asset.currency || "USD",
+    sector: asset.sector ?? undefined,
+    industry: asset.industry ?? undefined,
+    marketCap: toNum(asset.marketCap) ?? undefined,
+    description: asset.description ?? undefined,
+  };
 }
 
 function daysToRange(days: number): HistoricalRange {
@@ -207,9 +252,8 @@ export const enrichmentService = {
     };
 
     const fetched: FetchedData[] = [];
+    const pendingQuotes: typeof portfolio.holdings = [];
 
-    // Process holdings sequentially with small delay to avoid rate limits
-    // This is safer for free API tiers like Yahoo Finance
     for (const holding of portfolio.holdings) {
       const symbol = holding.asset.symbol;
 
@@ -248,7 +292,6 @@ export const enrichmentService = {
         console.log(`[enrichment] Skipping ${symbol} (recently enriched)`);
         skippedTickers.push(symbol);
 
-        // Use existing data for this holding
         const existingPrice = toNum(holding.asset.latestPrice);
         if (existingPrice != null) {
           fetched.push({
@@ -265,29 +308,27 @@ export const enrichmentService = {
         continue;
       }
 
-      try {
-        // Fetch all data for this ticker
-        const [profile, quote, history] = await Promise.all([
-          provider.getAssetProfile(symbol),
-          provider.getLatestQuote(symbol),
-          provider.getHistoricalPrices(symbol, "1Y"),
-        ]);
+      pendingQuotes.push(holding);
+    }
 
-        // Skip if we got a fallback quote with price 0
-        if (quote.price === 0) {
+    // Quotes first (and reuse a stored profile when we already have one).
+    // History is slower and used to die on Vercel's gateway before prices
+    // were written. Persist quotes, then fill history as a best-effort pass.
+    await mapPool(pendingQuotes, 4, async (holding) => {
+      const symbol = holding.asset.symbol;
+      try {
+        const quote = await provider.getLatestQuote(symbol);
+        if (!(quote.price > 0)) {
           console.warn(`[enrichment] No valid quote for ${symbol}, skipping`);
           failedTickers.push(symbol);
-          continue;
+          return;
         }
 
-        // Upsert enriched asset record
+        const profile = holding.asset.name
+          ? profileFromAsset(holding.asset)
+          : await provider.getAssetProfile(symbol);
+
         const asset = await assetRepository.upsertEnriched(profile, quote);
-
-        // Bulk-insert price history (idempotent via skipDuplicates)
-        if (history.length > 0) {
-          await priceHistoryRepository.upsertMany(asset.id, history);
-        }
-
         fetched.push({
           holdingId: holding.id,
           assetId: asset.id,
@@ -298,25 +339,18 @@ export const enrichmentService = {
           change: quote.change,
           changePercent: quote.changePercent,
         });
-
         console.log(
           `[enrichment] ${symbol}: $${quote.price.toFixed(2)} (${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toFixed(2)}%)`,
         );
-
-        // Small delay between requests to avoid rate limits
-        await delay(100);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(`[enrichment] Failed for ${symbol}: ${errMsg}`);
         failedTickers.push(symbol);
-
-        // If it looks like a rate limit, add extra delay
         if (errMsg.toLowerCase().includes("rate") || errMsg.includes("429")) {
-          console.warn(`[enrichment] Rate limit detected, adding delay...`);
-          await delay(2000);
+          await delay(1500);
         }
       }
-    }
+    });
 
     // ── Phase 2: compute portfolio metrics & persist in one transaction ─────
     // Calculate totals from ALL holdings, using existing data for failed/skipped ones
@@ -385,15 +419,37 @@ export const enrichmentService = {
       }
 
       // Update portfolio-level totals (preserving existing if enrichment failed)
+      const gotPrices = fetched.some(
+        (f) => f.symbol.toUpperCase() !== "CASH" && f.price > 0,
+      );
       await tx.portfolio.update({
         where: { id: portfolioId },
         data: {
           totalValue: finalTotalValue,
           totalCost: finalTotalCost,
           totalGain: finalTotalGain,
-          lastEnrichedAt: new Date(),
+          ...(gotPrices || skippedTickers.length > 0
+            ? { lastEnrichedAt: new Date() }
+            : {}),
         },
       });
+    });
+
+    const historyTargets = fetched.filter(
+      (f) => f.symbol.toUpperCase() !== "CASH" && f.price > 0,
+    );
+    await mapPool(historyTargets, 3, async (row) => {
+      try {
+        const history = await provider.getHistoricalPrices(row.symbol, "1Y");
+        if (history.length > 0) {
+          await priceHistoryRepository.upsertMany(row.assetId, history);
+        }
+      } catch (err) {
+        console.warn(
+          `[enrichment] History failed for ${row.symbol}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
     });
 
     console.log(
