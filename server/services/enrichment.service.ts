@@ -26,6 +26,7 @@
 import { prisma } from "@/lib/prisma";
 import { toNum } from "@/lib/utils";
 import { getMarketDataProvider, getProviderName } from "@/lib/market-data/provider";
+import { quoteCache, historyCache } from "@/lib/market-data/cache";
 import type { HistoricalRange } from "@/lib/market-data/types";
 import { assetRepository } from "@/server/repositories/asset.repository";
 import { priceHistoryRepository } from "@/server/repositories/price-history.repository";
@@ -167,6 +168,12 @@ export const enrichmentService = {
     const failedTickers: string[] = [];
     const skippedTickers: string[] = [];
     const forceRefresh = options?.forceRefresh ?? false;
+
+    // A forced click must hit the market, not an in-memory quote from a prior pass.
+    if (forceRefresh) {
+      quoteCache.clear();
+      historyCache.clear();
+    }
 
     console.log(
       `[enrichment] Starting enrichment for portfolio ${portfolioId} using ${providerName} provider`,

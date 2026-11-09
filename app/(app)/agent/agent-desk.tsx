@@ -146,8 +146,8 @@ export function AgentDesk({ overview }: AgentDeskProps) {
         running this app, the loop re-analyzes about every 15 minutes. On Vercel
         Hobby, one background pass runs daily at 14:00 UTC once{" "}
         <span className="font-mono text-[11.5px]">CRON_SECRET</span> is set.
-        While you are signed in, prices refresh about every minute. Pause stops
-        the agent. Run now forces a full pass immediately.
+        Pause stops the agent. Run now forces a full pass immediately.
+        Portfolio prices update when you choose Refresh market data.
       </div>
 
       {error ? (

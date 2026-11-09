@@ -2,7 +2,6 @@ import { timingSafeEqual } from "crypto";
 import { type NextRequest } from "next/server";
 import { ok, fail, withErrorHandling } from "@/lib/api-response";
 import { tradingAgentService } from "@/server/services/trading-agent.service";
-import { quoteRefreshService } from "@/server/services/quote-refresh.service";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -35,7 +34,6 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     return fail(401, "UNAUTHORIZED", "Invalid cron secret.");
   }
 
-  const quotes = await quoteRefreshService.refresh();
-  const tick = await tradingAgentService.tick({ limitMs: 200_000 });
-  return ok({ quotes, ...tick });
+  const tick = await tradingAgentService.tick({ limitMs: 240_000 });
+  return ok(tick);
 });

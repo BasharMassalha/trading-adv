@@ -25,9 +25,10 @@ export function EnrichButton({
     setErrorMsg(null);
 
     try {
-      const res = await fetch(`/api/portfolio/${portfolioId}/enrich`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/portfolio/${portfolioId}/enrich?force=true`,
+        { method: "POST" },
+      );
       const json = await res.json();
       if (!res.ok || !json.ok) {
         throw new Error(json?.error?.message ?? "Enrichment failed");
