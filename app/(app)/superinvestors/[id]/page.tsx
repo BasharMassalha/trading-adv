@@ -12,6 +12,7 @@ import { SUPERINVESTORS_DISCLAIMER } from "@/lib/superinvestors";
 import { formatCurrency } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type PageProps = {
   params: { id: string };

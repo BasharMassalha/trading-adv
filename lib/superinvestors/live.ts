@@ -27,6 +27,8 @@ import type {
 } from "./types";
 
 const TOP_LONGS = 40;
+/** Per-filer budget for prior XML + FIGI so QoQ never blocks the page. */
+const PRIOR_BUDGET_MS = 6_000;
 
 export const SUPERINVESTORS_DISCLAIMER =
   "All positions shown are parsed from the latest SEC Form 13F-HR on EDGAR for each filer’s CIK. 13F covers reported long U.S. equities and listed options only, with roughly a 45-day lag. Put options disclosed in the filing appear under shorts; most hedge-fund short books are not in 13F. No fabricated holdings, strategies, or market statements are shown. Not investment advice.";
@@ -35,17 +37,31 @@ type Cached13F = Sec13FLatestBundle & {
   fetchedAt: string;
 };
 
+type HydrateContext = {
+  profile: SuperinvestorProfile;
+  investor: Superinvestor;
+  filing?: Sec13FFiling;
+  previous?: Sec13FFilingRef | null;
+  tickers?: Map<string, string | null>;
+};
+
 const cachedFetch13F = unstable_cache(
   async (cik: string): Promise<Cached13F> => {
     const bundle = await fetchLatest13FBundle(cik);
     return { ...bundle, fetchedAt: new Date().toISOString() };
   },
-  ["superinvestor-13f-v4"],
+  ["superinvestor-13f-v5"],
   { revalidate: 60 * 60 * 12 },
 );
 
 const cachedFetchPrior13F = unstable_cache(
-  async (cik: string, accessionNumber: string, filingDate: string, reportDate: string, form: string) => {
+  async (
+    cik: string,
+    accessionNumber: string,
+    filingDate: string,
+    reportDate: string,
+    form: string,
+  ) => {
     const ref: Sec13FFilingRef = {
       accessionNumber,
       filingDate,
@@ -54,7 +70,7 @@ const cachedFetchPrior13F = unstable_cache(
     };
     return fetch13FByRef(cik, ref);
   },
-  ["superinvestor-13f-prior-v1"],
+  ["superinvestor-13f-prior-v2"],
   { revalidate: 60 * 60 * 12 },
 );
 
@@ -171,11 +187,61 @@ function summarizeHoldingsChange(
   };
 }
 
-async function hydrateProfile(
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise.then((value) => value),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function buildDataNotes(
+  base: Superinvestor,
+  filing: Sec13FFiling,
+  previous: Sec13FFilingRef | null | undefined,
+  equityCount: number,
+  putCount: number,
+): string[] {
+  const freshness = base.freshness;
+  return [
+    `Source: SEC EDGAR ${filing.form}, accession ${filing.accessionNumber}.`,
+    `Period of report ${filing.reportDate}; filed ${filing.filingDate}.`,
+    freshness
+      ? freshness.label +
+        (freshness.status === "behind"
+          ? ` (deadline for ${freshness.expectedQuarterLabel} was ${freshness.expectedDeadline}).`
+          : freshness.nextDeadline
+            ? ` Next period filings are due around ${freshness.nextDeadline}.`
+            : ".")
+      : null,
+    previous
+      ? `Prior published period ${format13FQuarter(previous.reportDate)} (filed ${previous.filingDate}).`
+      : "No prior 13F period found in recent EDGAR submissions.",
+    base.holdingsChange
+      ? `Vs prior period: ${base.holdingsChange.added.length} long name(s) added, ${base.holdingsChange.removed.length} exited.`
+      : null,
+    `Filing contains ${filing.holdings.length} aggregated line(s); showing top ${Math.min(TOP_LONGS, equityCount)} equity longs by value` +
+      (putCount
+        ? ` and ${Math.min(TOP_LONGS, putCount)} disclosed put(s).`
+        : "."),
+    "Weights are % of this 13F table total (not the firm’s full AUM).",
+  ].filter((n): n is string => Boolean(n));
+}
+
+/** Current filing only — keeps the list page responsive. */
+async function hydrateCurrent(
   profile: SuperinvestorProfile,
-  options?: { includeHoldingsChange?: boolean },
-): Promise<Superinvestor> {
-  const base: Superinvestor = {
+): Promise<HydrateContext> {
+  const investor: Superinvestor = {
     id: profile.id,
     name: profile.name,
     firm: profile.firm,
@@ -191,11 +257,11 @@ async function hydrateProfile(
   };
 
   if (!profile.cik) {
-    base.holdingsSource = "none";
-    base.dataNotes.push(
+    investor.holdingsSource = "none";
+    investor.dataNotes = [
       "No SEC Form 13F CIK for this person — positions are not available.",
-    );
-    return base;
+    ];
+    return { profile, investor };
   }
 
   try {
@@ -205,112 +271,139 @@ async function hydrateProfile(
     const { longs, shorts } = filingToPositions(filing, tickers);
     const freshness = assessFilingFreshness(filing.reportDate);
 
-    base.longs = longs;
-    base.shorts = shorts;
-    base.holdingsSource = "sec-13f";
-    base.asOfQuarter = format13FQuarter(filing.reportDate);
-    base.filingDate = filing.filingDate;
-    base.reportDate = filing.reportDate;
-    base.fetchedAt = fetchedAt;
-    base.freshness = freshness;
-    base.sourceUrl = filing.sourceUrl;
-    base.bookValueUsdM = filing.totalValueUsd / 1_000_000;
-    base.reportingEntity = `${profile.reportingEntity} · ${filing.form}`;
+    investor.longs = longs;
+    investor.shorts = shorts;
+    investor.holdingsSource = "sec-13f";
+    investor.asOfQuarter = format13FQuarter(filing.reportDate);
+    investor.filingDate = filing.filingDate;
+    investor.reportDate = filing.reportDate;
+    investor.fetchedAt = fetchedAt;
+    investor.freshness = freshness;
+    investor.sourceUrl = filing.sourceUrl;
+    investor.bookValueUsdM = filing.totalValueUsd / 1_000_000;
+    investor.reportingEntity = `${profile.reportingEntity} · ${filing.form}`;
 
     if (previous) {
-      base.previousReportDate = previous.reportDate;
-      base.previousFilingDate = previous.filingDate;
-      base.previousQuarter = format13FQuarter(previous.reportDate);
-
-      try {
-        const priorFiling = await cachedFetchPrior13F(
-          profile.cik,
-          previous.accessionNumber,
-          previous.filingDate,
-          previous.reportDate,
-          previous.form,
-        );
-        const changeCusips = [
-          ...longBookKeys(filing).keys(),
-          ...longBookKeys(priorFiling).keys(),
-        ];
-        const changeTickers = await resolveCusipsToTickers(changeCusips);
-        const priorPositions = filingToPositions(priorFiling, changeTickers);
-        base.priorLongs = priorPositions.longs;
-        base.priorShorts = priorPositions.shorts;
-
-        const holdingsChange = summarizeHoldingsChange(
-          filing,
-          priorFiling,
-          changeTickers,
-        );
-        const addedCusips = new Set(holdingsChange.added.map((r) => r.cusip));
-        base.longs = base.longs.map((p) => ({
-          ...p,
-          change: p.cusip && addedCusips.has(p.cusip) ? "added" : "held",
-        }));
-
-        if (options?.includeHoldingsChange) {
-          base.holdingsChange = holdingsChange;
-
-          // Surface full exits in the detail longs table.
-          const shownCusips = new Set(
-            base.longs
-              .map((p) => p.cusip)
-              .filter((c): c is string => Boolean(c)),
-          );
-          for (const row of holdingsChange.removed) {
-            if (shownCusips.has(row.cusip)) continue;
-            base.longs.push({
-              ticker: row.ticker,
-              name: row.name,
-              weightPct: 0,
-              side: "long",
-              note: `Exited since ${holdingsChange.previousQuarter}`,
-              concrete: row.ticker !== row.cusip,
-              cusip: row.cusip,
-              change: "removed",
-            });
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        console.error(
-          `[superinvestors] Prior 13F failed for ${profile.id}:`,
-          message,
-        );
-      }
+      investor.previousReportDate = previous.reportDate;
+      investor.previousFilingDate = previous.filingDate;
+      investor.previousQuarter = format13FQuarter(previous.reportDate);
     }
 
-    base.dataNotes = [
-      `Source: SEC EDGAR ${filing.form}, accession ${filing.accessionNumber}.`,
-      `Period of report ${filing.reportDate}; filed ${filing.filingDate}.`,
-      freshness.label +
-        (freshness.status === "behind"
-          ? ` (deadline for ${freshness.expectedQuarterLabel} was ${freshness.expectedDeadline}).`
-          : freshness.nextDeadline
-            ? ` Next period filings are due around ${freshness.nextDeadline}.`
-            : "."),
-      previous
-        ? `Prior published period ${format13FQuarter(previous.reportDate)} (filed ${previous.filingDate}).`
-        : "No prior 13F period found in recent EDGAR submissions.",
-      base.holdingsChange
-        ? `Vs prior period: ${base.holdingsChange.added.length} long name(s) added, ${base.holdingsChange.removed.length} exited.`
-        : null,
-      `Filing contains ${filing.holdings.length} aggregated line(s); showing top ${Math.min(TOP_LONGS, equity.length)} equity longs by value` +
-        (puts.length
-          ? ` and ${Math.min(TOP_LONGS, puts.length)} disclosed put(s).`
-          : "."),
-      "Weights are % of this 13F table total (not the firm’s full AUM).",
-    ].filter((n): n is string => Boolean(n));
-    return base;
+    investor.dataNotes = buildDataNotes(
+      investor,
+      filing,
+      previous,
+      equity.length,
+      puts.length,
+    );
+
+    return { profile, investor, filing, previous, tickers };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown 13F error";
     console.error(`[superinvestors] 13F failed for ${profile.id}:`, message);
-    base.holdingsSource = "unavailable";
-    base.holdingsError = message;
-    base.dataNotes = [`Live 13F fetch failed: ${message}`];
-    return base;
+    investor.holdingsSource = "unavailable";
+    investor.holdingsError = message;
+    investor.dataNotes = [`Live 13F fetch failed: ${message}`];
+    return { profile, investor };
+  }
+}
+
+type PriorPatch = {
+  priorLongs: SuperinvestorPosition[];
+  priorShorts: SuperinvestorPosition[];
+  longs: SuperinvestorPosition[];
+  holdingsChange?: HoldingsChangeSummary;
+};
+
+/**
+ * Prior-period work stays cheap: full-book CUSIP diff (no FIGI), and ticker
+ * resolution only for the same top-N slice used in the UI / consensus.
+ */
+async function buildPriorPatch(
+  ctx: HydrateContext,
+  options?: { includeHoldingsChange?: boolean },
+): Promise<PriorPatch | null> {
+  const { profile, investor, filing, previous, tickers } = ctx;
+  if (!profile.cik || !filing || !previous || !tickers) return null;
+
+  const priorFiling = await cachedFetchPrior13F(
+    profile.cik,
+    previous.accessionNumber,
+    previous.filingDate,
+    previous.reportDate,
+    previous.form,
+  );
+
+  const priorSelected = selectHoldingsForDisplay(priorFiling).selected;
+  const needResolve = priorSelected
+    .map((h) => h.cusip)
+    .filter((c) => !tickers.has(c));
+  const resolved = await resolveCusipsToTickers(needResolve);
+  const merged = new Map([...tickers, ...resolved]);
+
+  const priorPositions = filingToPositions(priorFiling, merged);
+  const curKeys = longBookKeys(filing);
+  const prevKeys = longBookKeys(priorFiling);
+  const addedCusips = new Set<string>();
+  for (const cusip of curKeys.keys()) {
+    if (!prevKeys.has(cusip)) addedCusips.add(cusip);
+  }
+
+  const longs: SuperinvestorPosition[] = investor.longs.map((p) => ({
+    ...p,
+    change: p.cusip && addedCusips.has(p.cusip) ? "added" : "held",
+  }));
+
+  let holdingsChange: HoldingsChangeSummary | undefined;
+  if (options?.includeHoldingsChange) {
+    holdingsChange = summarizeHoldingsChange(filing, priorFiling, merged);
+    const priorTopCusips = new Set(priorSelected.map((h) => h.cusip));
+    const shownCusips = new Set(
+      longs.map((p) => p.cusip).filter((c): c is string => Boolean(c)),
+    );
+    for (const row of holdingsChange.removed) {
+      if (!priorTopCusips.has(row.cusip) || shownCusips.has(row.cusip)) continue;
+      longs.push({
+        ticker: row.ticker,
+        name: row.name,
+        weightPct: 0,
+        side: "long",
+        note: `Exited since ${holdingsChange.previousQuarter}`,
+        concrete: row.ticker !== row.cusip,
+        cusip: row.cusip,
+        change: "removed",
+      });
+    }
+  }
+
+  return {
+    priorLongs: priorPositions.longs,
+    priorShorts: priorPositions.shorts,
+    longs,
+    holdingsChange,
+  };
+}
+
+function applyPriorPatch(
+  ctx: HydrateContext,
+  patch: PriorPatch,
+): void {
+  const { investor, filing, previous } = ctx;
+  investor.priorLongs = patch.priorLongs;
+  investor.priorShorts = patch.priorShorts;
+  investor.longs = patch.longs;
+  if (patch.holdingsChange) {
+    investor.holdingsChange = patch.holdingsChange;
+  }
+  if (filing) {
+    const { equity, puts } = selectHoldingsForDisplay(filing);
+    investor.dataNotes = buildDataNotes(
+      investor,
+      filing,
+      previous,
+      equity.length,
+      puts.length,
+    );
   }
 }
 
@@ -337,12 +430,41 @@ async function mapPool<T, R>(
   return results;
 }
 
-export async function loadSuperinvestorsSnapshot(
-  minHolders = 3,
-): Promise<SuperinvestorsSnapshot> {
-  const investors = await mapPool(SUPERINVESTOR_PROFILES, 2, hydrateProfile);
+function stripPriorBooks(inv: Superinvestor): Superinvestor {
+  const { priorLongs: _l, priorShorts: _s, ...rest } = inv;
+  return rest;
+}
 
-  const liveCount = investors.filter((i) => i.holdingsSource === "sec-13f").length;
+async function attachPriorsWithBudget(
+  contexts: HydrateContext[],
+  options?: { includeHoldingsChange?: boolean },
+): Promise<void> {
+  await mapPool(contexts, 3, async (ctx) => {
+    if (!ctx.previous || !ctx.filing) return;
+    const patch = await withTimeout(
+      buildPriorPatch(ctx, options),
+      PRIOR_BUDGET_MS,
+    );
+    if (!patch) {
+      console.warn(
+        `[superinvestors] Prior 13F timed out for ${ctx.profile.id} — serving current filing without QoQ badges.`,
+      );
+      return;
+    }
+    applyPriorPatch(ctx, patch);
+  });
+}
+
+async function buildSuperinvestorsSnapshot(
+  minHolders: number,
+): Promise<SuperinvestorsSnapshot> {
+  const contexts = await mapPool(SUPERINVESTOR_PROFILES, 3, hydrateCurrent);
+  await attachPriorsWithBudget(contexts);
+
+  const investors = contexts.map((c) => c.investor);
+
+  const liveCount = investors.filter((i) => i.holdingsSource === "sec-13f")
+    .length;
   const failedCount = investors.filter(
     (i) => i.holdingsSource === "unavailable",
   ).length;
@@ -385,7 +507,7 @@ export async function loadSuperinvestorsSnapshot(
     currentCount,
     behindCount,
     fetchedAt,
-    investors,
+    investors: investors.map(stripPriorBooks),
     consensusLongs,
     consensusShorts,
     disclaimer: SUPERINVESTORS_DISCLAIMER,
@@ -394,10 +516,35 @@ export async function loadSuperinvestorsSnapshot(
   };
 }
 
+export async function loadSuperinvestorsSnapshot(
+  minHolders = 3,
+): Promise<SuperinvestorsSnapshot> {
+  const cached = unstable_cache(
+    async () => buildSuperinvestorsSnapshot(minHolders),
+    ["superinvestors-snapshot-v6", String(minHolders)],
+    { revalidate: 60 * 60 * 12 },
+  );
+  return cached();
+}
+
 export async function loadSuperinvestorById(
   id: string,
 ): Promise<Superinvestor | null> {
   const profile = getProfileById(id);
   if (!profile) return null;
-  return hydrateProfile(profile, { includeHoldingsChange: true });
+
+  const ctx = await hydrateCurrent(profile);
+  if (ctx.previous && ctx.filing) {
+    const patch = await withTimeout(
+      buildPriorPatch(ctx, { includeHoldingsChange: true }),
+      PRIOR_BUDGET_MS * 2,
+    );
+    if (patch) applyPriorPatch(ctx, patch);
+    else {
+      console.warn(
+        `[superinvestors] Prior 13F timed out for ${profile.id} — detail page without QoQ.`,
+      );
+    }
+  }
+  return stripPriorBooks(ctx.investor);
 }

@@ -10,6 +10,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { Superinvestor } from "@/lib/superinvestors";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 export const metadata: Metadata = {
   title: "Superinvestors",
   description:
