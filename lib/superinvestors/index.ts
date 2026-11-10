@@ -10,6 +10,12 @@ export {
   SUPERINVESTORS_DISCLAIMER,
 } from "./live";
 export {
+  assessFilingFreshness,
+  expectedLatestReportDate,
+  type FilingFreshness,
+  type FilingFreshnessStatus,
+} from "./freshness";
+export {
   getSuperinvestorConsensusContext,
   type ConsensusSignal,
   type SuperinvestorConsensusContext,

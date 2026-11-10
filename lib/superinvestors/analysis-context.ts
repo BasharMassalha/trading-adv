@@ -59,11 +59,17 @@ const cachedConsensus = unstable_cache(
       asOfLabel: snapshot.asOfLabel,
       liveFilerCount: snapshot.liveCount,
       minHolders: MIN_HOLDERS,
-      longs: snapshot.consensusLongs.slice(0, MAX_LONGS).map(toSignal),
-      shorts: snapshot.consensusShorts.slice(0, MAX_SHORTS).map(toSignal),
+      longs: snapshot.consensusLongs
+        .filter((row) => row.change !== "removed")
+        .slice(0, MAX_LONGS)
+        .map(toSignal),
+      shorts: snapshot.consensusShorts
+        .filter((row) => row.change !== "removed")
+        .slice(0, MAX_SHORTS)
+        .map(toSignal),
     };
   },
-  ["superinvestor-consensus-analysis-v1"],
+  ["superinvestor-consensus-analysis-v2"],
   { revalidate: 60 * 60 * 12 },
 );
 

@@ -17,6 +17,18 @@ type PageProps = {
   params: { id: string };
 };
 
+function formatShortDate(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${iso.slice(0, 10)}T00:00:00Z`));
+  } catch {
+    return iso;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -29,6 +41,10 @@ export async function generateMetadata({
 export default async function SuperinvestorDetailPage({ params }: PageProps) {
   const inv = await superinvestorsService.getById(params.id);
   if (!inv) notFound();
+
+  const change = inv.holdingsChange;
+  const changeCount =
+    (change?.added.length ?? 0) + (change?.removed.length ?? 0);
 
   return (
     <div className="space-y-5">
@@ -65,6 +81,13 @@ export default async function SuperinvestorDetailPage({ params }: PageProps) {
               ? "13F unavailable"
               : "No 13F"}
         </Badge>
+        {inv.freshness?.status === "current" ||
+        inv.freshness?.status === "early" ? (
+          <Badge variant="success">On latest period</Badge>
+        ) : null}
+        {inv.freshness?.status === "behind" ? (
+          <Badge variant="warning">{inv.freshness.label}</Badge>
+        ) : null}
         {inv.cik ? (
           <Badge variant="outline">
             CIK <span className="font-mono">{inv.cik}</span>
@@ -72,10 +95,112 @@ export default async function SuperinvestorDetailPage({ params }: PageProps) {
         ) : null}
         {inv.filingDate ? (
           <Badge variant="outline">
-            Filed <span className="font-mono">{inv.filingDate}</span>
+            Filed {formatShortDate(inv.filingDate)}
           </Badge>
         ) : null}
       </div>
+
+      {inv.holdingsSource === "sec-13f" && inv.freshness ? (
+        <p className="border bg-surface px-4 py-3 text-[12.5px] leading-relaxed text-muted-foreground">
+          This book is reported as of{" "}
+          <span className="font-medium text-foreground">
+            {inv.reportDate
+              ? formatShortDate(inv.reportDate)
+              : inv.asOfQuarter}
+          </span>
+          {inv.filingDate ? (
+            <>
+              {" "}
+              and was filed with the SEC on{" "}
+              <span className="font-medium text-foreground">
+                {formatShortDate(inv.filingDate)}
+              </span>
+            </>
+          ) : null}
+          . {inv.freshness.label}
+          {inv.freshness.status === "behind"
+            ? ` The calendar expects ${inv.freshness.expectedQuarterLabel} (deadline ${formatShortDate(inv.freshness.expectedDeadline)}).`
+            : inv.freshness.nextDeadline
+              ? ` The next period’s filings are due around ${formatShortDate(inv.freshness.nextDeadline)}.`
+              : ""}{" "}
+          13F never shows trades inside a quarter — only the snapshot at
+          period-end, published ~45 days later.
+        </p>
+      ) : null}
+
+      {change ? (
+        <div className="border bg-surface p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[14px] font-semibold tracking-tight">
+              Change vs {change.previousQuarter}
+            </h2>
+            <p className="text-[12px] text-muted-foreground">
+              Prior period filed {formatShortDate(change.previousFilingDate)}
+            </p>
+          </div>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">
+            {changeCount === 0
+              ? "No long names were added or fully exited between the two filings (among disclosed equity/call lines)."
+              : `${change.added.length} long name${change.added.length === 1 ? "" : "s"} added · ${change.removed.length} exited since ${change.previousQuarter}.`}
+          </p>
+          {changeCount > 0 ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-faint">
+                  Added
+                </div>
+                {change.added.length === 0 ? (
+                  <p className="mt-1.5 text-[12.5px] text-muted-foreground">
+                    None
+                  </p>
+                ) : (
+                  <ul className="mt-1.5 space-y-1 text-[12.5px]">
+                    {change.added.slice(0, 12).map((row) => (
+                      <li key={`a-${row.ticker}`}>
+                        <span className="font-mono font-medium text-success">
+                          {row.ticker}
+                        </span>{" "}
+                        <span className="text-muted-foreground">{row.name}</span>
+                      </li>
+                    ))}
+                    {change.added.length > 12 ? (
+                      <li className="text-faint">
+                        +{change.added.length - 12} more
+                      </li>
+                    ) : null}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-faint">
+                  Exited
+                </div>
+                {change.removed.length === 0 ? (
+                  <p className="mt-1.5 text-[12.5px] text-muted-foreground">
+                    None
+                  </p>
+                ) : (
+                  <ul className="mt-1.5 space-y-1 text-[12.5px]">
+                    {change.removed.slice(0, 12).map((row) => (
+                      <li key={`r-${row.ticker}`}>
+                        <span className="font-mono font-medium text-destructive">
+                          {row.ticker}
+                        </span>{" "}
+                        <span className="text-muted-foreground">{row.name}</span>
+                      </li>
+                    ))}
+                    {change.removed.length > 12 ? (
+                      <li className="text-faint">
+                        +{change.removed.length - 12} more
+                      </li>
+                    ) : null}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="border bg-surface p-5">
         <p className="max-w-3xl text-[13px] leading-relaxed text-muted-foreground">

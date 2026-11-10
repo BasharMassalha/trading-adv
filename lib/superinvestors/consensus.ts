@@ -1,4 +1,8 @@
-import type { ConsensusPosition, PositionSide, Superinvestor } from "./types";
+import type {
+  ConsensusPosition,
+  PositionSide,
+  Superinvestor,
+} from "./types";
 
 function isConcretePosition(ticker: string, concrete?: boolean): boolean {
   if (concrete === false) return false;
@@ -27,6 +31,8 @@ export function computeConsensus(
     const book = side === "long" ? inv.longs : inv.shorts;
     for (const pos of book) {
       if (pos.side !== side) continue;
+      // Exited rows are display-only on detail pages; skip for consensus.
+      if (pos.change === "removed") continue;
       if (!isConcretePosition(pos.ticker, pos.concrete)) continue;
 
       const key = pos.ticker.toUpperCase();
@@ -62,4 +68,41 @@ export function computeConsensus(
   return rows.sort(
     (a, b) => b.holderCount - a.holderCount || b.avgWeightPct - a.avgWeightPct,
   );
+}
+
+/** Mark consensus rows New / Exited vs the prior filing period’s consensus. */
+export function annotateConsensusChanges(
+  current: ConsensusPosition[],
+  prior: ConsensusPosition[],
+): ConsensusPosition[] {
+  const priorByTicker = new Map(prior.map((p) => [p.ticker, p]));
+  const currentTickers = new Set(current.map((p) => p.ticker));
+
+  const live = current.map((p) => ({
+    ...p,
+    change: priorByTicker.has(p.ticker)
+      ? ("held" as const)
+      : ("added" as const),
+  }));
+
+  const exited = prior
+    .filter((p) => !currentTickers.has(p.ticker))
+    .map((p) => ({
+      ...p,
+      avgWeightPct: 0,
+      change: "removed" as const,
+    }));
+
+  return [...live, ...exited];
+}
+
+/** Swap each investor’s current book for their prior-period book. */
+export function investorsWithPriorBooks(
+  investors: Superinvestor[],
+): Superinvestor[] {
+  return investors.map((inv) => ({
+    ...inv,
+    longs: inv.priorLongs ?? [],
+    shorts: inv.priorShorts ?? [],
+  }));
 }

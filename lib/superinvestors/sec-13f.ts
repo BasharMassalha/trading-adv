@@ -28,6 +28,20 @@ export type Sec13FFiling = {
   totalValueUsd: number;
 };
 
+/** Lightweight pointer to a 13F in the submissions index (no holdings yet). */
+export type Sec13FFilingRef = {
+  accessionNumber: string;
+  filingDate: string;
+  reportDate: string;
+  form: string;
+};
+
+export type Sec13FLatestBundle = {
+  filing: Sec13FFiling;
+  /** Prior distinct report-period filing, if EDGAR has one. */
+  previous: Sec13FFilingRef | null;
+};
+
 const SEC_DATA = "https://data.sec.gov";
 const SEC_WWW = "https://www.sec.gov";
 
@@ -206,40 +220,50 @@ export function aggregateHoldings(raw: Raw13FHolding[]): Raw13FHolding[] {
   return [...map.values()].sort((a, b) => b.valueUsd - a.valueUsd);
 }
 
-export async function fetchLatest13F(cik: string): Promise<Sec13FFiling> {
-  const padded = padCik(cik);
-  const submissionsUrl = `${SEC_DATA}/submissions/CIK${padded}.json`;
-  const submissions = (await (
-    await secFetch(submissionsUrl)
-  ).json()) as SubmissionsJson;
-
+function list13FRefs(submissions: SubmissionsJson): Sec13FFilingRef[] {
   const recent = submissions.filings.recent;
-  let idx = -1;
+  const refs: Sec13FFilingRef[] = [];
   for (let i = 0; i < recent.form.length; i++) {
     const form = recent.form[i];
-    // Prefer amendments when they appear first (most recent)
-    if (form === "13F-HR" || form === "13F-HR/A") {
-      idx = i;
-      break;
-    }
+    if (form !== "13F-HR" && form !== "13F-HR/A") continue;
+    refs.push({
+      accessionNumber: recent.accessionNumber[i],
+      filingDate: recent.filingDate[i],
+      reportDate: recent.reportDate[i],
+      form,
+    });
   }
-  if (idx < 0) {
-    throw new Error(`No 13F-HR filing found for CIK ${padded}`);
-  }
+  return refs;
+}
 
-  const accessionNumber = recent.accessionNumber[idx];
-  const filingDate = recent.filingDate[idx];
-  const reportDate = recent.reportDate[idx];
-  const form = recent.form[idx];
-  const accessionPath = accessionNumber.replace(/-/g, "");
-  const cikNum = stripCikLeadingZeros(padded);
+/** First filing for a different report period than `latest` (skips amendments). */
+export function findPreviousPeriodRef(
+  refs: Sec13FFilingRef[],
+  latest: Sec13FFilingRef,
+): Sec13FFilingRef | null {
+  return (
+    refs.find(
+      (r) =>
+        r.accessionNumber !== latest.accessionNumber &&
+        r.reportDate &&
+        r.reportDate !== latest.reportDate,
+    ) ?? null
+  );
+}
+
+async function loadFilingFromRef(
+  paddedCik: string,
+  ref: Sec13FFilingRef,
+): Promise<Sec13FFiling> {
+  const accessionPath = ref.accessionNumber.replace(/-/g, "");
+  const cikNum = stripCikLeadingZeros(paddedCik);
 
   const indexUrl = `${SEC_WWW}/Archives/edgar/data/${cikNum}/${accessionPath}/index.json`;
   const index = (await (await secFetch(indexUrl)).json()) as IndexJson;
   const infoFile = pickInfoTableFile(index.directory.item ?? []);
   if (!infoFile) {
     throw new Error(
-      `No information table XML in filing ${accessionNumber} for CIK ${padded}`,
+      `No information table XML in filing ${ref.accessionNumber} for CIK ${paddedCik}`,
     );
   }
 
@@ -249,13 +273,50 @@ export async function fetchLatest13F(cik: string): Promise<Sec13FFiling> {
   const totalValueUsd = holdings.reduce((s, h) => s + h.valueUsd, 0);
 
   return {
-    cik: padded,
-    accessionNumber,
-    filingDate,
-    reportDate,
-    form,
+    cik: paddedCik,
+    accessionNumber: ref.accessionNumber,
+    filingDate: ref.filingDate,
+    reportDate: ref.reportDate,
+    form: ref.form,
     sourceUrl: infoUrl,
     holdings,
     totalValueUsd,
   };
+}
+
+export async function fetchLatest13F(cik: string): Promise<Sec13FFiling> {
+  const bundle = await fetchLatest13FBundle(cik);
+  return bundle.filing;
+}
+
+/**
+ * Latest 13F holdings plus a pointer to the prior report period (no prior XML).
+ */
+export async function fetchLatest13FBundle(
+  cik: string,
+): Promise<Sec13FLatestBundle> {
+  const padded = padCik(cik);
+  const submissionsUrl = `${SEC_DATA}/submissions/CIK${padded}.json`;
+  const submissions = (await (
+    await secFetch(submissionsUrl)
+  ).json()) as SubmissionsJson;
+
+  const refs = list13FRefs(submissions);
+  if (refs.length === 0) {
+    throw new Error(`No 13F-HR filing found for CIK ${padded}`);
+  }
+
+  const latestRef = refs[0];
+  const filing = await loadFilingFromRef(padded, latestRef);
+  const previous = findPreviousPeriodRef(refs, latestRef);
+
+  return { filing, previous };
+}
+
+/** Full holdings for a prior-period ref (used for QoQ change detection). */
+export async function fetch13FByRef(
+  cik: string,
+  ref: Sec13FFilingRef,
+): Promise<Sec13FFiling> {
+  return loadFilingFromRef(padCik(cik), ref);
 }

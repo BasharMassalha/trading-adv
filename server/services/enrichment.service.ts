@@ -211,10 +211,11 @@ export const enrichmentService = {
    *
    * Options:
    *  - forceRefresh: Skip the cooldown check and refresh all assets
+   *  - skipHistory: Persist quotes/totals only; caller can fill history later
    */
   async enrich(
     portfolioId: string,
-    options?: { forceRefresh?: boolean },
+    options?: { forceRefresh?: boolean; skipHistory?: boolean },
   ): Promise<EnrichmentResult> {
     const portfolio = await portfolioRepository.findById(portfolioId);
     if (!portfolio) throw new NotFoundError("Portfolio not found.");
@@ -435,10 +436,52 @@ export const enrichmentService = {
       });
     });
 
-    const historyTargets = fetched.filter(
-      (f) => f.symbol.toUpperCase() !== "CASH" && f.price > 0,
+    if (!options?.skipHistory) {
+      await this.fillHistory(
+        fetched
+          .filter((f) => f.symbol.toUpperCase() !== "CASH" && f.price > 0)
+          .map((f) => ({ assetId: f.assetId, symbol: f.symbol })),
+      );
+    }
+
+    console.log(
+      `[enrichment] Completed: ${fetched.length} enriched, ${skippedTickers.length} skipped, ${failedTickers.length} failed` +
+        (options?.skipHistory ? " (history deferred)" : ""),
     );
-    await mapPool(historyTargets, 3, async (row) => {
+
+    return {
+      portfolioId,
+      enrichedCount: fetched.length,
+      failedTickers,
+      totalValue: finalTotalValue ?? 0,
+    };
+  },
+
+  /**
+   * Best-effort 1Y candle fill for holdings that already have prices.
+   * Safe to run after the HTTP response on Vercel via waitUntil.
+   */
+  async fillHistoryForPortfolio(portfolioId: string): Promise<void> {
+    const portfolio = await portfolioRepository.findById(portfolioId);
+    if (!portfolio) return;
+
+    const targets = portfolio.holdings
+      .filter((h) => {
+        const sym = h.asset.symbol.toUpperCase();
+        if (sym === "CASH" || h.asset.type === "CASH") return false;
+        return (toNum(h.asset.latestPrice) ?? 0) > 0;
+      })
+      .map((h) => ({ assetId: h.assetId, symbol: h.asset.symbol }));
+
+    await this.fillHistory(targets);
+  },
+
+  async fillHistory(
+    targets: { assetId: string; symbol: string }[],
+  ): Promise<void> {
+    if (targets.length === 0) return;
+    const provider = getMarketDataProvider();
+    await mapPool(targets, 3, async (row) => {
       try {
         const history = await provider.getHistoricalPrices(row.symbol, "1Y");
         if (history.length > 0) {
@@ -451,17 +494,6 @@ export const enrichmentService = {
         );
       }
     });
-
-    console.log(
-      `[enrichment] Completed: ${fetched.length} enriched, ${skippedTickers.length} skipped, ${failedTickers.length} failed`,
-    );
-
-    return {
-      portfolioId,
-      enrichedCount: fetched.length,
-      failedTickers,
-      totalValue: finalTotalValue ?? 0,
-    };
   },
 
   // ---------------------------------------------------------------------------

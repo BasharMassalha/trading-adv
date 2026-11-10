@@ -2,15 +2,17 @@
  * Quote/history fetches that work on Vercel.
  *
  * yahoo-finance2 talks to Yahoo with a cookie/crumb dance and Node-only
- * shims. Datacenter IPs often get nothing back. These are plain HTTPS
- * calls: Yahoo's chart v8 endpoint first, then Finnhub when NEWS_API_KEY
- * or MARKET_DATA_API_KEY is set.
+ * shims. Datacenter IPs often get nothing back (or hang). These are plain
+ * HTTPS calls: Finnhub when a key is set (reliable from Vercel), then Yahoo
+ * chart v8 on query1/query2.
  */
 
 import type { HistoricalPricePoint, HistoricalRange, LatestQuote } from "./types";
 
 const YAHOO_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"] as const;
 
 function round4(n: number | undefined | null): number | undefined {
   if (n == null || !Number.isFinite(n)) return undefined;
@@ -58,6 +60,10 @@ type YahooChartResult = {
     regularMarketDayLow?: number;
     regularMarketVolume?: number;
     shortName?: string;
+    longName?: string;
+    instrumentType?: string;
+    exchangeName?: string;
+    currency?: string;
   };
   timestamp?: number[];
   indicators?: {
@@ -104,13 +110,39 @@ function quoteFromYahooMeta(
 export async function fetchYahooHttpQuote(
   symbol: string,
 ): Promise<LatestQuote | null> {
-  const json = (await getJson(
-    yahooChartUrl("query1.finance.yahoo.com", symbol, "5d"),
-    { "User-Agent": YAHOO_UA },
-  )) as { chart?: { result?: YahooChartResult[] } } | null;
-  const result = json?.chart?.result?.[0];
-  if (!result?.meta) return null;
-  return quoteFromYahooMeta(symbol, result.meta);
+  for (const host of YAHOO_HOSTS) {
+    const json = (await getJson(yahooChartUrl(host, symbol, "5d"), {
+      "User-Agent": YAHOO_UA,
+    })) as { chart?: { result?: YahooChartResult[] } } | null;
+    const result = json?.chart?.result?.[0];
+    if (!result?.meta) continue;
+    const quote = quoteFromYahooMeta(symbol, result.meta);
+    if (quote) return quote;
+  }
+  return null;
+}
+
+/** Lightweight profile fields from Yahoo chart meta (no yahoo-finance2). */
+export async function fetchYahooHttpProfileMeta(symbol: string): Promise<{
+  name?: string;
+  exchange?: string;
+  currency?: string;
+  instrumentType?: string;
+} | null> {
+  for (const host of YAHOO_HOSTS) {
+    const json = (await getJson(yahooChartUrl(host, symbol, "5d"), {
+      "User-Agent": YAHOO_UA,
+    })) as { chart?: { result?: YahooChartResult[] } } | null;
+    const meta = json?.chart?.result?.[0]?.meta;
+    if (!meta) continue;
+    return {
+      name: meta.shortName ?? meta.longName,
+      exchange: meta.exchangeName,
+      currency: meta.currency,
+      instrumentType: meta.instrumentType,
+    };
+  }
+  return null;
 }
 
 export async function fetchFinnhubQuote(
@@ -144,7 +176,35 @@ export async function fetchFinnhubQuote(
   };
 }
 
+export async function fetchFinnhubProfile(
+  symbol: string,
+): Promise<{ name?: string; exchange?: string; currency?: string; finnhubIndustry?: string } | null> {
+  const key = finnhubKey();
+  if (!key) return null;
+  const json = (await getJson(
+    `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(key)}`,
+  )) as {
+    name?: string;
+    exchange?: string;
+    currency?: string;
+    finnhubIndustry?: string;
+  } | null;
+  if (!json || (!json.name && !json.exchange)) return null;
+  return json;
+}
+
+/**
+ * Resolve a live quote. On Vercel prefer Finnhub (datacenter-friendly), then Yahoo.
+ * Locally Yahoo is usually fine, so try it first and fall back to Finnhub.
+ */
 export async function fetchHttpQuote(symbol: string): Promise<LatestQuote | null> {
+  const onVercel = process.env.VERCEL === "1";
+  if (onVercel) {
+    const finnhub = await fetchFinnhubQuote(symbol);
+    if (finnhub && finnhub.price > 0) return finnhub;
+    return fetchYahooHttpQuote(symbol);
+  }
+
   const yahoo = await fetchYahooHttpQuote(symbol);
   if (yahoo && yahoo.price > 0) return yahoo;
   return fetchFinnhubQuote(symbol);
@@ -163,32 +223,35 @@ export async function fetchYahooHttpHistory(
   symbol: string,
   range: HistoricalRange,
 ): Promise<HistoricalPricePoint[]> {
-  const json = (await getJson(
-    yahooChartUrl("query1.finance.yahoo.com", symbol, RANGE_TO_YAHOO[range]),
-    {
-      "User-Agent": YAHOO_UA,
-    },
-  )) as { chart?: { result?: YahooChartResult[] } } | null;
-  const result = json?.chart?.result?.[0];
-  const stamps = result?.timestamp;
-  const quote = result?.indicators?.quote?.[0];
-  if (!stamps || !quote?.close) return [];
+  for (const host of YAHOO_HOSTS) {
+    const json = (await getJson(
+      yahooChartUrl(host, symbol, RANGE_TO_YAHOO[range]),
+      { "User-Agent": YAHOO_UA },
+    )) as { chart?: { result?: YahooChartResult[] } } | null;
+    const result = json?.chart?.result?.[0];
+    const stamps = result?.timestamp;
+    const quote = result?.indicators?.quote?.[0];
+    if (!stamps || !quote?.close) continue;
 
-  const points: HistoricalPricePoint[] = [];
-  for (let i = 0; i < stamps.length; i += 1) {
-    const close = quote.close[i];
-    if (close == null || !Number.isFinite(close)) continue;
-    const date = new Date(stamps[i] * 1000).toISOString().slice(0, 10);
-    points.push({
-      date,
-      close: round4(close) ?? close,
-      open: round4(quote.open?.[i] ?? undefined),
-      high: round4(quote.high?.[i] ?? undefined),
-      low: round4(quote.low?.[i] ?? undefined),
-      volume: quote.volume?.[i] ?? undefined,
-    });
+    const points: HistoricalPricePoint[] = [];
+    for (let i = 0; i < stamps.length; i += 1) {
+      const close = quote.close[i];
+      if (close == null || !Number.isFinite(close)) continue;
+      const date = new Date(stamps[i] * 1000).toISOString().slice(0, 10);
+      points.push({
+        date,
+        close: round4(close) ?? close,
+        open: round4(quote.open?.[i] ?? undefined),
+        high: round4(quote.high?.[i] ?? undefined),
+        low: round4(quote.low?.[i] ?? undefined),
+        volume: quote.volume?.[i] ?? undefined,
+      });
+    }
+    if (points.length > 0) {
+      return points.sort((a, b) => a.date.localeCompare(b.date));
+    }
   }
-  return points.sort((a, b) => a.date.localeCompare(b.date));
+  return [];
 }
 
 export async function fetchHttpHistory(

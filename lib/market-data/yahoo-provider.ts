@@ -31,7 +31,16 @@ import type {
   LatestQuote,
 } from "./types";
 import { profileCache, quoteCache, historyCache } from "./cache";
-import { fetchHttpHistory, fetchHttpQuote } from "./http-quotes";
+import {
+  fetchFinnhubProfile,
+  fetchHttpHistory,
+  fetchHttpQuote,
+  fetchYahooHttpProfileMeta,
+} from "./http-quotes";
+
+function onVercel(): boolean {
+  return process.env.VERCEL === "1";
+}
 
 // ---------------------------------------------------------------------------
 // Type definitions for yahoo-finance2 responses
@@ -219,6 +228,13 @@ export class YahooFinanceProvider implements IMarketDataProvider {
     const cacheKey = `profile:${normalized}`;
 
     return profileCache.getOrSet(cacheKey, async () => {
+      // yahoo-finance2 often hangs or returns nothing from Vercel IPs.
+      if (onVercel()) {
+        const http = await this.profileFromHttp(normalized);
+        if (http) return http;
+        return buildFallbackProfile(normalized);
+      }
+
       try {
         const yf = await this.getYF();
         const result: YFQuoteSummaryResult = await yf.quoteSummary(normalized, {
@@ -249,9 +265,42 @@ export class YahooFinanceProvider implements IMarketDataProvider {
           throw err;
         }
         console.warn(`[yahoo] Profile fetch failed for ${normalized}:`, err);
+        const http = await this.profileFromHttp(normalized);
+        if (http) return http;
         return buildFallbackProfile(normalized);
       }
     });
+  }
+
+  private async profileFromHttp(normalized: string): Promise<AssetProfile | null> {
+    const finnhub = await fetchFinnhubProfile(normalized);
+    if (finnhub?.name) {
+      return {
+        symbol: normalized,
+        name: finnhub.name,
+        type: "STOCK",
+        exchange: finnhub.exchange,
+        currency: finnhub.currency ?? "USD",
+        sector: finnhub.finnhubIndustry,
+        industry: finnhub.finnhubIndustry,
+        marketCap: undefined,
+        description: undefined,
+      };
+    }
+
+    const yahoo = await fetchYahooHttpProfileMeta(normalized);
+    if (!yahoo) return null;
+    return {
+      symbol: normalized,
+      name: yahoo.name ?? normalized,
+      type: mapQuoteType(yahoo.instrumentType),
+      exchange: yahoo.exchange,
+      currency: yahoo.currency ?? "USD",
+      sector: undefined,
+      industry: undefined,
+      marketCap: undefined,
+      description: undefined,
+    };
   }
 
   async getLatestQuote(symbol: string): Promise<LatestQuote> {
@@ -268,10 +317,13 @@ export class YahooFinanceProvider implements IMarketDataProvider {
   }
 
   private async resolveQuote(normalized: string): Promise<LatestQuote> {
-    // On Vercel, yahoo-finance2 is often blocked or too slow. Hit HTTP first.
-    if (process.env.VERCEL === "1") {
+    // On Vercel never touch yahoo-finance2 — it hangs or returns empty from
+    // datacenter IPs. HTTP (Finnhub + Yahoo chart) is the only reliable path.
+    if (onVercel()) {
       const http = await fetchHttpQuote(normalized);
       if (http && http.price > 0) return http;
+      console.warn(`[yahoo] No HTTP quote for ${normalized}, using fallback`);
+      return buildFallbackQuote(normalized);
     }
 
     const fromLib = await this.quoteFromYahooLib(normalized);
@@ -331,9 +383,11 @@ export class YahooFinanceProvider implements IMarketDataProvider {
     const cacheKey = `history:${normalized}:${range}`;
 
     return historyCache.getOrSet(cacheKey, async () => {
-      if (process.env.VERCEL === "1") {
+      if (onVercel()) {
         const http = await fetchHttpHistory(normalized, range);
         if (http.length > 0) return http;
+        console.warn(`[yahoo] No HTTP history for ${normalized}`);
+        return [];
       }
 
       try {

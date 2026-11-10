@@ -10,8 +10,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatPercent } from "@/lib/utils";
-import type { ConsensusPosition } from "@/lib/superinvestors";
+import { cn, formatPercent } from "@/lib/utils";
+import type {
+  ConsensusPosition,
+  PositionChange,
+} from "@/lib/superinvestors";
 
 type Props = {
   title: string;
@@ -20,6 +23,16 @@ type Props = {
   emptyHint: string;
   tone: "long" | "short";
 };
+
+function changeBadge(change?: PositionChange) {
+  if (change === "added") {
+    return <Badge variant="success">New</Badge>;
+  }
+  if (change === "removed") {
+    return <Badge variant="destructive">Exited</Badge>;
+  }
+  return null;
+}
 
 export function ConsensusTable({
   title,
@@ -54,11 +67,29 @@ export function ConsensusTable({
           </TableHeader>
           <TableBody>
             {positions.map((p) => (
-              <TableRow key={`${tone}-${p.ticker}`}>
-                <TableCell className="font-mono font-semibold">
-                  {p.ticker}
+              <TableRow
+                key={`${tone}-${p.change ?? "held"}-${p.ticker}`}
+                className={cn(p.change === "removed" && "opacity-70")}
+              >
+                <TableCell>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "font-mono font-semibold",
+                        p.change === "removed" && "line-through",
+                      )}
+                    >
+                      {p.ticker}
+                    </span>
+                    {changeBadge(p.change)}
+                  </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell
+                  className={cn(
+                    "text-muted-foreground",
+                    p.change === "removed" && "line-through",
+                  )}
+                >
                   {p.name}
                 </TableCell>
                 <TableCell className="text-right">
@@ -70,7 +101,9 @@ export function ConsensusTable({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatPercent(p.avgWeightPct)}
+                  {p.change === "removed"
+                    ? "—"
+                    : formatPercent(p.avgWeightPct)}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-x-2 gap-y-1">

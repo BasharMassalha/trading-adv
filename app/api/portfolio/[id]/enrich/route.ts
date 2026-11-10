@@ -23,10 +23,11 @@ async function loadOwnedPortfolio(userId: string, portfolioId: string) {
 
 /**
  * POST /api/portfolio/[id]/enrich
- * Refresh prices (and later, history) for a portfolio.
+ * Refresh prices for a portfolio.
  *
- * On Vercel the Yahoo/history pass takes longer than the gateway allows, so
- * this returns 202 and finishes in the background. The client polls GET.
+ * Quotes are awaited in-request (HTTP/Finnhub — fast enough for the gateway).
+ * On Vercel, 1Y history is filled after the response via waitUntil so candles
+ * cannot starve the price write that the UI needs.
  */
 export const POST = withErrorHandling(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
@@ -40,30 +41,22 @@ export const POST = withErrorHandling(
 
     const { searchParams } = new URL(req.url);
     const forceRefresh = searchParams.get("force") === "true";
-    const startedAt = new Date().toISOString();
+    const deferHistory = process.env.VERCEL === "1";
 
-    const run = () =>
-      enrichmentService.enrich(params.id, { forceRefresh });
+    const result = await enrichmentService.enrich(params.id, {
+      forceRefresh,
+      skipHistory: deferHistory,
+    });
 
-    if (process.env.VERCEL === "1") {
+    if (deferHistory) {
       const { waitUntil } = await import("@vercel/functions");
       waitUntil(
-        run().catch((err) => {
-          console.error("[enrichment] Background refresh failed:", err);
+        enrichmentService.fillHistoryForPortfolio(params.id).catch((err) => {
+          console.error("[enrichment] Background history failed:", err);
         }),
-      );
-      return ok(
-        {
-          started: true,
-          startedAt,
-          provider: getProviderName(),
-          message: "Price refresh started.",
-        },
-        { status: 202 },
       );
     }
 
-    const result = await run();
     const view = await enrichmentService.getPortfolioView(params.id);
     return ok({
       ...result,
