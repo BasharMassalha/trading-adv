@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PortfolioViewDTO } from "@/server/services/enrichment.service";
@@ -11,16 +11,22 @@ export function EnrichButton({
   portfolioId,
   lastEnrichedAt,
   onEnriched,
+  autoStart = false,
+  label,
 }: {
   portfolioId: string;
   lastEnrichedAt: string | Date | null;
   onEnriched?: (portfolio: PortfolioViewDTO) => void;
+  /** Kick off enrichment once on mount when market data is missing. */
+  autoStart?: boolean;
+  label?: string;
 }) {
   const [state, setState] = useState<State>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [enrichedCount, setEnrichedCount] = useState<number | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const [localUpdatedAt, setLocalUpdatedAt] = useState<string | null>(null);
+  const autoStarted = useRef(false);
 
   async function handleRefresh() {
     setState("loading");
@@ -70,8 +76,16 @@ export function EnrichButton({
     }
   }
 
+  useEffect(() => {
+    if (!autoStart || lastEnrichedAt || autoStarted.current) return;
+    autoStarted.current = true;
+    void handleRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start once when data is missing
+  }, [autoStart, lastEnrichedAt, portfolioId]);
+
   const stamp = localUpdatedAt ?? lastEnrichedAt;
   const ago = stamp ? formatRelative(new Date(stamp)) : "never";
+  const idleLabel = label ?? "Refresh market data";
 
   return (
     <div className="flex flex-col items-end gap-1.5">
@@ -99,7 +113,7 @@ export function EnrichButton({
         ) : (
           <>
             <RefreshCw className="h-3.5 w-3.5" />
-            Refresh market data
+            {idleLabel}
           </>
         )}
       </Button>

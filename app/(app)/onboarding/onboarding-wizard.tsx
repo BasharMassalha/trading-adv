@@ -207,6 +207,7 @@ export function OnboardingWizard() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData>({
     riskTolerance: "",
     investmentHorizon: "",
@@ -248,6 +249,7 @@ export function OnboardingWizard() {
 
   async function handleComplete() {
     setSaving(true);
+    setSaveError(null);
     try {
       const body = {
         riskTolerance: profileData.riskTolerance,
@@ -271,11 +273,14 @@ export function OnboardingWizard() {
         throw new Error("Failed to save profile");
       }
 
-      // Redirect to portfolio upload
       router.push("/portfolio/upload?onboarding=true");
     } catch (err) {
       console.error("Failed to save profile:", err);
-      alert("Failed to save profile. Please try again.");
+      setSaveError(
+        err instanceof Error
+          ? err.message
+          : "Failed to save profile. Please try again.",
+      );
     } finally {
       setSaving(false);
     }
@@ -371,6 +376,20 @@ export function OnboardingWizard() {
           <CompleteStep profileData={profileData} />
         )}
       </div>
+
+      {saveError ? (
+        <div className="border border-destructive/30 bg-destructive-soft px-3.5 py-3 text-[12.5px] text-destructive">
+          {saveError}{" "}
+          <button
+            type="button"
+            className="font-medium underline-offset-4 hover:underline"
+            onClick={handleComplete}
+            disabled={saving}
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       {/* Navigation */}
       <div className="flex items-center justify-between border-t pt-4">

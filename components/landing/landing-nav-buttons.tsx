@@ -18,14 +18,7 @@ export function LandingHeaderNav() {
           Sign in
         </Link>
       </Button>
-      <TryFreeAnalysisButton tone="inline" className="hidden sm:inline-flex">
-        Try free
-      </TryFreeAnalysisButton>
-      <Button size="sm" variant="outline" asChild className="sm:hidden">
-        <Link href="/sign-up" onClick={onNav}>
-          Get started
-        </Link>
-      </Button>
+      <TryFreeAnalysisButton tone="inline">Try free</TryFreeAnalysisButton>
     </nav>
   );
 }
@@ -48,13 +41,12 @@ export function LandingHeroCtas() {
         <span className="text-border-strong" aria-hidden>
           ·
         </span>
-        <Link
-          href="/dashboard"
-          onClick={onNav}
+        <a
+          href="#report"
           className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           See a worked example
-        </Link>
+        </a>
       </div>
     </div>
   );

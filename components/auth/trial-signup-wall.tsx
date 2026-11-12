@@ -25,9 +25,11 @@ export function TrialSignupWall({
   const begin = useBeginNavigation();
   if (!open) return null;
 
-  const href = returnTo
-    ? `/sign-up?from=trial&next=${encodeURIComponent(returnTo)}`
-    : "/sign-up?from=trial";
+  const nextQuery = returnTo
+    ? `&next=${encodeURIComponent(returnTo)}`
+    : "";
+  const signUpHref = `/sign-up?from=trial${nextQuery}`;
+  const signInHref = `/sign-in?from=trial${nextQuery}`;
 
   return (
     <div
@@ -48,12 +50,12 @@ export function TrialSignupWall({
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button asChild>
-            <Link href={href} onClick={begin}>
+            <Link href={signUpHref} onClick={begin}>
               Sign up free
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/sign-in?from=trial" onClick={begin}>
+            <Link href={signInHref} onClick={begin}>
               Sign in
             </Link>
           </Button>

@@ -4,9 +4,8 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { BrandLockup } from "@/components/brand";
+import { BrandLockup, BRAND_CHROME_FOOTNOTE } from "@/components/brand";
 import { NavLinks } from "@/components/layout/nav-links";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 
@@ -59,10 +58,7 @@ export function MobileNavDrawer({
         )}
       >
         <div className="flex h-14 items-center justify-between border-b px-3">
-          <div className="flex items-center gap-2">
-            <BrandLockup size="sm" />
-            {isGuest ? <Badge variant="info">Trial</Badge> : null}
-          </div>
+          <BrandLockup size="sm" />
           <Button
             variant="ghost"
             size="icon"
@@ -96,9 +92,7 @@ export function MobileNavDrawer({
           </div>
         ) : (
           <div className="border-t px-5 py-3 text-[11px] leading-relaxed text-faint">
-            Analysis is evidence-led and cited.
-            <br />
-            Nothing executes without you.
+            {BRAND_CHROME_FOOTNOTE}
           </div>
         )}
       </aside>

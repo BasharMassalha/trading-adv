@@ -11,6 +11,7 @@ import {
   FileText,
   Lightbulb,
   Loader2,
+  Lock,
   MessageSquare,
   Newspaper,
   RefreshCw,
@@ -43,6 +44,7 @@ import {
   type AdvisorPortfolioOption,
 } from "@/components/advisor/advisor-portfolio-picker";
 import { GuestTrialBanner } from "@/components/auth/guest-trial-banner";
+import { GuestSaveAnalysisCard } from "@/components/auth/guest-save-analysis-card";
 import { TrialSignupWall } from "@/components/auth/trial-signup-wall";
 import { TrialContentLock } from "@/components/auth/trial-content-lock";
 
@@ -348,8 +350,15 @@ export function AdvisorDashboard({
             News
           </TabsTrigger>
           <TabsTrigger value="chat" className="gap-2">
-            <MessageSquare className="h-4 w-4 stroke-[1.6]" />
+            {isGuest ? (
+              <Lock className="h-3.5 w-3.5 stroke-[1.6]" />
+            ) : (
+              <MessageSquare className="h-4 w-4 stroke-[1.6]" />
+            )}
             Chat
+            {isGuest ? (
+              <span className="text-[10px] font-normal text-faint">Sign up</span>
+            ) : null}
           </TabsTrigger>
         </TabsList>
 
@@ -420,35 +429,29 @@ export function AdvisorDashboard({
         </TabsContent>
 
         <TabsContent value="chat" className="mt-5">
-          <div className="h-[calc(100vh-20rem)]">
-            <AdvisorChat
-              portfolioId={portfolio.id}
-              isGuest={isGuest}
-              onRequireSignup={() =>
+          {isGuest ? (
+            <TrialContentLock
+              title="Chat unlocks with a free account"
+              description="Ask follow-ups on any holding, verdict, or risk call. Sign up to keep this analysis and open chat."
+              ctaLabel="Sign up to unlock"
+              onSeeMore={() =>
                 openSignupWall(
                   "Sign up to ask follow-ups",
                   "Chat with the advisor is available after you create a free account. Your analysis stays with you.",
                 )
               }
             />
-          </div>
+          ) : (
+            <div className="h-[calc(100vh-20rem)]">
+              <AdvisorChat portfolioId={portfolio.id} />
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
       {isGuest && latestReport ? (
-        <div className="sticky bottom-4 z-20 flex justify-center pt-2">
-          <Button
-            size="lg"
-            className="min-w-[160px] shadow-md"
-            onClick={() =>
-              openSignupWall(
-                "Sign in to save this portfolio",
-                "Create a free account or sign in to keep this book and your analysis. Without an account, this trial can expire.",
-              )
-            }
-          >
-            Save
-          </Button>
+        <div className="sticky bottom-0 z-20 -mx-1 border-t bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <GuestSaveAnalysisCard portfolioId={portfolio.id} />
         </div>
       ) : null}
 
@@ -507,6 +510,21 @@ function EmptyReportState({
 }) {
   const canGenerate = readiness?.ready ?? false;
 
+  if (generating) {
+    return (
+      <div className="border bg-surface p-8 text-center">
+        <Loader2 className="mx-auto h-6 w-6 animate-spin stroke-[1.6] text-primary" />
+        <h3 className="mt-4 text-[14px] font-semibold">
+          Building your analysis
+        </h3>
+        <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
+          Usually 2–3 minutes. You can leave this page and come back — the report
+          stays on this portfolio when it finishes.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="border border-dashed bg-surface p-8 text-center">
       <h3 className="text-[14px] font-semibold">No analysis yet</h3>
@@ -522,17 +540,8 @@ function EmptyReportState({
         disabled={!canGenerate || generating}
         className="mt-5 gap-2"
       >
-        {generating ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin stroke-[1.6]" />
-            Analysing, usually 2–3 min
-          </>
-        ) : (
-          <>
-            <Zap className="h-4 w-4 stroke-[1.6]" />
-            Generate analysis
-          </>
-        )}
+        <Zap className="h-4 w-4 stroke-[1.6]" />
+        Generate analysis
       </Button>
 
       {error && (

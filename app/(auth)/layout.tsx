@@ -16,7 +16,7 @@ export default function AuthLayout({
     <div className="flex min-h-screen">
       {/* Marketing rail — desktop only, so the form owns small screens. */}
       <aside className="hidden w-[46%] max-w-[560px] flex-col justify-between bg-foreground p-12 lg:flex">
-        <BrandLockup size="lg" />
+        <BrandLockup size="lg" tone="ink" />
 
         <div>
           <p className="max-w-[400px] text-[26px] font-semibold leading-tight tracking-tight text-background">

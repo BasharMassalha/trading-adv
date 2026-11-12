@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" role="img" aria-labelledby="title desc">
+  <title id="title">Screenshot crop guide</title>
+  <desc id="desc">Crop the holdings table — ticker, shares, and cost or value. Leave out charts and account totals.</desc>
+  <defs>
+    <clipPath id="screen">
+      <rect x="0" y="0" width="960" height="540" rx="12"/>
+    </clipPath>
+    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5EEAD4" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#5EEAD4" stop-opacity="0"/>
+    </linearGradient>
+    <style><![CDATA[
+      .dim { animation: dimPulse 7s ease-in-out infinite; }
+      .crop { animation: cropPulse 7s ease-in-out infinite; }
+      .label { animation: labelIn 7s ease-in-out infinite; }
+      @keyframes dimPulse {
+        0%, 8% { opacity: 0; }
+        22%, 78% { opacity: 0.58; }
+        92%, 100% { opacity: 0; }
+      }
+      @keyframes cropPulse {
+        0%, 8% { opacity: 0; stroke-width: 2; }
+        22%, 78% { opacity: 1; stroke-width: 3; }
+        92%, 100% { opacity: 0; stroke-width: 2; }
+      }
+      @keyframes labelIn {
+        0%, 18% { opacity: 0; }
+        28%, 75% { opacity: 1; }
+        88%, 100% { opacity: 0; }
+      }
+    ]]></style>
+  </defs>
+
+  <rect width="960" height="540" fill="#F4F6F8"/>
+  <g clip-path="url(#screen)">
+    <rect width="960" height="540" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="960" height="52" fill="#0B0E11"/>
+    <circle cx="28" cy="26" r="5" fill="#5EEAD4"/>
+    <text x="44" y="31" fill="#FFFFFF" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14">broker.portfolio</text>
+    <text x="860" y="31" fill="#9CA3AF" font-family="system-ui, -apple-system, sans-serif" font-size="12" text-anchor="end">Demo account</text>
+
+    <text x="72" y="92" fill="#6B7280" font-family="system-ui, -apple-system, sans-serif" font-size="12">Account value</text>
+    <text x="72" y="122" fill="#111827" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="28" font-weight="700">$248,410.22</text>
+    <text x="320" y="92" fill="#6B7280" font-family="system-ui, -apple-system, sans-serif" font-size="12">Day change</text>
+    <text x="320" y="122" fill="#059669" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="20">+$1,284.10</text>
+
+    <rect x="620" y="68" width="268" height="72" rx="8" fill="#F3F4F6"/>
+    <path d="M640 120 C680 110, 700 95, 740 100 S800 88, 860 78" fill="none" stroke="#5EEAD4" stroke-width="2.5"/>
+    <path d="M640 120 C680 110, 700 95, 740 100 S800 88, 860 78 L860 132 L640 132 Z" fill="url(#chartGrad)"/>
+
+    <rect x="72" y="168" width="816" height="248" rx="10" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="72" y="168" width="816" height="40" rx="10" fill="#F9FAFB"/>
+    <rect x="72" y="198" width="816" height="10" fill="#F9FAFB"/>
+    <text x="96" y="194" fill="#6B7280" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Symbol</text>
+    <text x="260" y="194" fill="#6B7280" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Shares</text>
+    <text x="420" y="194" fill="#6B7280" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Avg cost</text>
+    <text x="620" y="194" fill="#6B7280" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600">Market value</text>
+
+    <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#111827">
+      <text x="96" y="236" font-weight="700">AAPL</text>
+      <text x="260" y="236">42</text>
+      <text x="420" y="236">$178.20</text>
+      <text x="620" y="236">$9,214.80</text>
+      <line x1="88" y1="252" x2="872" y2="252" stroke="#F3F4F6"/>
+      <text x="96" y="284" font-weight="700">MSFT</text>
+      <text x="260" y="284">18</text>
+      <text x="420" y="284">$312.40</text>
+      <text x="620" y="284">$7,448.40</text>
+      <line x1="88" y1="300" x2="872" y2="300" stroke="#F3F4F6"/>
+      <text x="96" y="332" font-weight="700">VTI</text>
+      <text x="260" y="332">120</text>
+      <text x="420" y="332">$214.05</text>
+      <text x="620" y="332">$25,686.00</text>
+      <line x1="88" y1="348" x2="872" y2="348" stroke="#F3F4F6"/>
+      <text x="96" y="380" font-weight="700">BRK.B</text>
+      <text x="260" y="380">15</text>
+      <text x="420" y="380">$402.10</text>
+      <text x="620" y="380">$6,631.50</text>
+    </g>
+
+    <path class="dim" fill="#0B0E11" fill-rule="evenodd" d="M0 0 H960 V540 H0 Z M72 168 H888 V416 H72 Z"/>
+
+    <rect class="crop" x="72" y="168" width="816" height="248" fill="none" stroke="#5EEAD4" rx="10"/>
+    <g class="crop" fill="none" stroke="#5EEAD4" stroke-width="4" stroke-linecap="square">
+      <path d="M72 196 V178 H90"/>
+      <path d="M888 196 V178 H870"/>
+      <path d="M72 388 V416 H90"/>
+      <path d="M888 388 V416 H870"/>
+    </g>
+
+    <g class="label">
+      <rect x="250" y="448" width="460" height="40" rx="20" fill="#0B0E11"/>
+      <text x="480" y="473" text-anchor="middle" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600">Capture this table — crop out charts &amp; totals</text>
+    </g>
+  </g>
+</svg>

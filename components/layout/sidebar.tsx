@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BrandLockup } from "@/components/brand";
+import { BrandLockup, BRAND_CHROME_FOOTNOTE } from "@/components/brand";
 import { NavLinks } from "@/components/layout/nav-links";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 
@@ -18,11 +17,6 @@ export function Sidebar({ isGuest = false }: SidebarProps) {
     <aside className="hidden w-[216px] min-w-[216px] flex-col border-r bg-surface px-3 py-[18px] md:flex">
       <div className="px-2 pb-3">
         <BrandLockup size="sm" />
-        {isGuest ? (
-          <div className="mt-3">
-            <Badge variant="info">Free trial</Badge>
-          </div>
-        ) : null}
       </div>
 
       <nav className="flex-1 overflow-y-auto">
@@ -42,9 +36,7 @@ export function Sidebar({ isGuest = false }: SidebarProps) {
         </div>
       ) : (
         <div className="mt-auto border-t px-2.5 pb-1 pt-3 text-[11px] leading-relaxed text-faint">
-          Analysis is evidence-led and cited.
-          <br />
-          Agent trades stay inside a book you arm.
+          {BRAND_CHROME_FOOTNOTE}
         </div>
       )}
     </aside>

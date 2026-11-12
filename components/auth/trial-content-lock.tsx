@@ -8,17 +8,19 @@ type Props = {
   description: string;
   /** Opens the sign-in / sign-up wall */
   onSeeMore: () => void;
+  ctaLabel?: string;
   /** Extra locked rows shown blurred behind the CTA */
   blurredPreview?: React.ReactNode;
 };
 
 /**
- * Inline teaser for gated trial content. "See more" opens the auth wall.
+ * Inline teaser for gated trial content. CTA opens the auth wall.
  */
 export function TrialContentLock({
   title,
   description,
   onSeeMore,
+  ctaLabel = "See more",
   blurredPreview,
 }: Props) {
   return (
@@ -42,7 +44,7 @@ export function TrialContentLock({
           </div>
         </div>
         <Button size="sm" variant="outline" className="shrink-0" onClick={onSeeMore}>
-          See more
+          {ctaLabel}
         </Button>
       </div>
     </div>

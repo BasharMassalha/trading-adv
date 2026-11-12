@@ -121,29 +121,33 @@ export function PortfolioDetailClient({
         }
         title={view.name}
         description={
-          <span className="font-mono text-[11.5px] text-faint">
-            ID {portfolioId} · Source {view.source} · {view.baseCurrency}
+          <span className="text-[12px] text-faint">
+            {view.holdings.length} holdings
+            {view.source ? ` · ${view.source}` : ""}
+            {view.baseCurrency ? ` · ${view.baseCurrency}` : ""}
           </span>
         }
         actions={
           <>
-            <Button variant="outline" size="sm" asChild>
-              <Link
-                href={
-                  isGuest
-                    ? "/portfolio/upload?trial=true"
-                    : `/portfolio/upload?portfolioId=${encodeURIComponent(portfolioId)}`
-                }
-              >
-                Re-import
-              </Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href={`/advisor?portfolio=${encodeURIComponent(portfolioId)}`}>
-                <Sparkles className="h-3.5 w-3.5" />
-                {isGuest ? "Run analysis" : "AI advisor"}
-              </Link>
-            </Button>
+            {!isGuest ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link
+                  href={`/portfolio/upload?portfolioId=${encodeURIComponent(portfolioId)}`}
+                >
+                  Re-import
+                </Link>
+              </Button>
+            ) : null}
+            {isEnriched ? (
+              <Button size="sm" asChild>
+                <Link
+                  href={`/advisor?portfolio=${encodeURIComponent(portfolioId)}`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {isGuest ? "Continue to analysis" : "AI advisor"}
+                </Link>
+              </Button>
+            ) : null}
             {!isGuest ? (
               <>
                 <RenamePortfolioButton
@@ -160,6 +164,8 @@ export function PortfolioDetailClient({
               portfolioId={portfolioId}
               lastEnrichedAt={view.lastEnrichedAt}
               onEnriched={handleEnriched}
+              autoStart={isGuest && needsEnrichment}
+              label={isGuest ? "Load market data" : undefined}
             />
           </>
         }
@@ -170,11 +176,14 @@ export function PortfolioDetailClient({
           <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
           <div>
             <p className="font-medium text-warning">
-              Market data not yet loaded
+              {isGuest
+                ? "Loading market data for your analysis"
+                : "Market data not yet loaded"}
             </p>
             <p className="mt-1 leading-relaxed text-muted-foreground">
-              Choose &ldquo;Refresh market data&rdquo; above to fetch live prices,
-              sector data, and 1-year price history for all your holdings.
+              {isGuest
+                ? "Fetching live prices and sector data now. When that finishes, continue to analysis."
+                : "Choose “Refresh market data” above to fetch live prices, sector data, and 1-year price history for all your holdings."}
             </p>
           </div>
         </div>

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ParseResult } from "@/lib/portfolio/parsed-holding";
+import { ScreenshotGuide } from "@/components/portfolio/screenshot-guide";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -305,9 +306,10 @@ export function UploadTabs({
 }) {
   const csv = useUpload("/api/portfolio/upload-csv");
   const img = useUpload("/api/portfolio/upload-image");
+  const [tab, setTab] = useState("csv");
 
   return (
-    <Tabs defaultValue="csv">
+    <Tabs value={tab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="csv">
           <FileText className="h-3.5 w-3.5" />
@@ -373,13 +375,14 @@ Stock,    Qty,       Cost Basis, Value,      USD`}
           <CardHeader>
             <CardTitle className="text-[14px]">Upload screenshot</CardTitle>
             <CardDescription className="text-[12.5px]">
-              Take a screenshot of your broker&rsquo;s portfolio page. AI reads
-              the holdings automatically.
+              Screenshot your broker&rsquo;s holdings table — the guide below
+              shows what to include. AI reads ticker, shares, and cost or value.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {img.status !== "parsed" ? (
               <>
+                <ScreenshotGuide active={tab === "image"} />
                 <DropZone
                   accept="image/png,image/jpeg,image/webp"
                   hint="PNG, JPG or WebP up to 8 MB; higher resolution = better accuracy"
@@ -393,27 +396,10 @@ Stock,    Qty,       Cost Basis, Value,      USD`}
                     {img.errorMessage}
                   </p>
                 )}
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-faint">
-                    Layouts we read reliably
-                  </p>
-                  <div className="mt-2.5 grid grid-cols-2 gap-2">
-                    {[
-                      "Schwab portfolio",
-                      "Fidelity holdings",
-                      "Robinhood positions",
-                      "IBKR activity",
-                    ].map((label) => (
-                      <div
-                        key={label}
-                        className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-[11.5px] text-muted-foreground"
-                      >
-                        <CheckCircle2 className="h-3 w-3 shrink-0 text-success" />
-                        {label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-[11.5px] leading-relaxed text-faint">
+                  Works with common layouts (Schwab, Fidelity, Robinhood, IBKR).
+                  If extraction misses rows, try a tighter crop or CSV export.
+                </p>
               </>
             ) : (
               <ParseSummary

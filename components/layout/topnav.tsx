@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useBeginNavigation } from "@/components/loading/navigation-loading-context";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MarketStatusPill } from "@/components/layout/market-status-pill";
 import { BrandLockup } from "@/components/brand";
@@ -59,18 +58,12 @@ export function Topnav({ onOpenMobileNav, isGuest = false }: TopnavProps) {
       </div>
 
       <div className="hidden items-center gap-2 text-[12.5px] text-faint md:flex">
-        {isGuest ? (
-          <>
-            <Badge variant="info" className="font-normal">
-              Free trial
-            </Badge>
-            <span aria-hidden>·</span>
-          </>
-        ) : (
-          <span>{clientEnv.NEXT_PUBLIC_APP_NAME}</span>
-        )}
+        <span>{isGuest ? "Free trial" : clientEnv.NEXT_PUBLIC_APP_NAME}</span>
         {section ? (
-          <span className="font-medium text-foreground">{section}</span>
+          <>
+            <span aria-hidden>·</span>
+            <span className="font-medium text-foreground">{section}</span>
+          </>
         ) : null}
       </div>
 

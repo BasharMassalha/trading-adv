@@ -51,20 +51,12 @@ export default async function PortfolioListPage() {
         title="Portfolios"
         description="Every book you track, with its latest valuation."
         actions={
-          <>
-            <Button variant="outline" asChild>
-              <Link href="/portfolio/upload">
-                <Upload className="h-3.5 w-3.5 stroke-[1.6]" />
-                Import
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/portfolio/upload">
-                <Plus className="h-3.5 w-3.5 stroke-[1.6]" />
-                New portfolio
-              </Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link href="/portfolio/upload">
+              <Upload className="h-3.5 w-3.5 stroke-[1.6]" />
+              Import portfolio
+            </Link>
+          </Button>
         }
       />
 

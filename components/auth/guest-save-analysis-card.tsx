@@ -42,7 +42,10 @@ export function GuestSaveAnalysisCard({ portfolioId }: Props) {
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/sign-in?from=trial" onClick={begin}>
+            <Link
+              href={`/sign-in?from=trial&next=${encodeURIComponent(next)}`}
+              onClick={begin}
+            >
               Sign in
             </Link>
           </Button>
